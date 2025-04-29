@@ -6,6 +6,9 @@ edition = "2024"
 keywords = ["cli", "git", "helper", "commands"]
 license = "Apache-2.0 OR MIT"
 name = "rona"
-version = "0.0.1"
+version = "0.1.0"
 
 [dependencies]
+clap = { version = "4.5.37", features = ["derive"] }
+glob = "0.3.2"
+regex = "1.11.1"
