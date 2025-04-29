@@ -1,8 +1,15 @@
 use clap::{Parser, Subcommand, command};
 
+use dialoguer::Select;
 use glob::Pattern;
 
-use crate::git_related::{add_files, commit};
+use crate::{
+    git_related::{
+        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, add_files, commit, create_needed_files,
+        prepare_commit_msg,
+    },
+    my_clap_theme,
+};
 
 #[derive(Subcommand, Debug)] // TODO: Remove Debug
 enum Commands {
@@ -23,6 +30,11 @@ enum Commands {
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
     },
+
+    /// Generate subcommand
+    /// Directly generate the `commit_message.md` file.
+    #[command(short_flag = 'g')]
+    Generate,
 }
 
 #[derive(Parser)]
@@ -67,13 +79,28 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Commit { args } => {
             commit(&args, cli.verbose)?;
         }
-    }
+        Commands::Generate => {
+            create_needed_files()?;
 
-    // match cli.command {
-    //     Commands::AddAndExclude { exclude } => {
-    //         println!("Adding all files and excluding: {:?}", exclude);
-    //     }
-    // }
+            let commit_type =
+                COMMIT_TYPES[Select::with_theme(&my_clap_theme::ColorfulTheme::default())
+                    .default(0)
+                    .items(&COMMIT_TYPES)
+                    .interact()
+                    .unwrap()];
+
+            prepare_commit_msg(commit_type, cli.verbose)?;
+
+            let editor = dotenv::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+
+            // Open the commit message file in the editor of the user's choice
+            let _ = std::process::Command::new(editor)
+                .arg(COMMIT_MESSAGE_FILE_PATH)
+                .spawn()
+                .expect("Error opening the file in the editor")
+                .wait();
+        }
+    }
 
     Ok(())
 }

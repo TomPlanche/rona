@@ -1,4 +1,8 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    io::{Error as IoError, ErrorKind},
+    path::Path,
+};
 
 /// # `MessageType`
 /// Trait for message types.
@@ -158,4 +162,110 @@ pub fn format_list<T: Display>(items: &[T]) -> String {
         .map(|item| format!("  - {item}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// # `check_for_file_in_folder`
+/// Checks if a file path starts with or is contained within a folder path.
+///
+/// ## Arguments
+/// * `file_path` - Path of the file to check
+/// * `folder_path` - Path of the containing folder
+///
+/// ## Errors
+/// Returns an error if:
+/// * The file path is invalid (empty or has invalid parent)
+/// * The folder path is invalid or empty
+/// * Either path cannot be converted to a canonical form
+///
+/// ## Returns
+/// * `Ok(bool)` - True if the file is within the folder, false otherwise
+/// * `Err(std::io::Error)` - If there's an error processing the paths
+pub fn check_for_file_in_folder(file_path: &Path, folder_path: &Path) -> Result<bool, IoError> {
+    // Validate inputs
+    if file_path.as_os_str().is_empty() {
+        return Err(IoError::new(ErrorKind::InvalidInput, "File path is empty"));
+    }
+    if folder_path.as_os_str().is_empty() {
+        return Err(IoError::new(
+            ErrorKind::InvalidInput,
+            "Folder path is empty",
+        ));
+    }
+
+    // Get the parent directory of the file
+    let file_parent = file_path.parent().ok_or_else(|| {
+        IoError::new(
+            ErrorKind::InvalidInput,
+            "Invalid file path: cannot get parent directory",
+        )
+    })?;
+
+    // Check if file_path starts with folder_path
+    Ok(file_parent.starts_with(folder_path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_check_for_file_in_folder() {
+        // Valid cases
+        assert!(check_for_file_in_folder(Path::new("src/file.rs"), Path::new("src")).unwrap());
+
+        assert!(
+            check_for_file_in_folder(Path::new("src/nested/deep/file.rs"), Path::new("src"))
+                .unwrap()
+        );
+
+        assert!(!check_for_file_in_folder(Path::new("other/file.rs"), Path::new("src")).unwrap());
+    }
+
+    #[test]
+    fn test_check_for_file_in_folder_errors() {
+        // Empty paths
+        assert!(check_for_file_in_folder(Path::new(""), Path::new("src")).is_err());
+
+        assert!(check_for_file_in_folder(Path::new("file.txt"), Path::new("")).is_err());
+    }
+
+    #[test]
+    fn test_format_list() {
+        let items = vec!["item1", "item2", "item3"];
+        let formatted = format_list(&items);
+
+        assert_eq!(formatted, "  - item1\n  - item2\n  - item3");
+
+        // Empty list
+        let empty: Vec<&str> = vec![];
+        assert_eq!(format_list(&empty), "");
+
+        // Single item
+        let single = vec!["item"];
+        assert_eq!(format_list(&single), "  - item");
+    }
+
+    #[test]
+    fn test_message_formatting() {
+        // Test error message format
+        let error_msg = format_message::<Error>("Test Error", "Error details");
+        assert!(error_msg.contains("🚨 ERROR"));
+        assert!(error_msg.contains("Test Error"));
+        assert!(error_msg.contains("Error details"));
+
+        // Test success message format
+        let success_msg = format_message::<Success>("Test Success", "Success details");
+        assert!(success_msg.contains("✅ SUCCESS"));
+        assert!(success_msg.contains("Test Success"));
+        assert!(success_msg.contains("Success details"));
+
+        // Test with suggestion
+        let error_with_suggestion = format_message_with_suggestion::<Error>(
+            "Test Error",
+            "Error details",
+            "Try this instead",
+        );
+        assert!(error_with_suggestion.contains("Try this instead"));
+    }
 }

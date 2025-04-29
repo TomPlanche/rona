@@ -73,6 +73,7 @@ A  README.md
 ?? src/lib.rs
 ?? src/utils.rs
 ```
+
 ### `commit` (-c)
 
 This command commits all changes with a custom message from the `commit_message.md` file.
@@ -85,3 +86,22 @@ rona -c [extra args]
 ```
 
 This will commit all changes with the message from the `commit_message.md` file.
+
+### `generate` (-g)
+
+This command generates or updates the `commit_message.md` file with a template based on staged changes. It provides an interactive commit type selection and opens the file in your default editor.
+
+Example:
+```bash
+rona generate
+# or
+rona -g
+```
+
+The command will:
+1. Create `commit_message.md` and `.commitignore` files if they don't exist
+2. Add both files to `.git/info/exclude`
+3. Present an interactive selection of commit types (chore/feat/fix/test)
+4. Generate commit message template with staged files
+5. Open the message in your default editor (set via EDITOR env variable)
+```
