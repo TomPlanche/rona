@@ -144,7 +144,6 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 ///
 /// ## Arguments
 /// * `args` - The arguments to pass to the git commit command.
-/// * `verbose` - Whether to print verbose output.
 ///
 /// ## Errors
 /// * If writing commit message fails
@@ -152,7 +151,7 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 ///
 /// ## Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn git_commit(args: &Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
     if commit_file_path.exists() {
@@ -166,9 +165,7 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::
             return Err(Box::new(Error::other(format!("Git commit failed: {e}"))));
         }
 
-        if verbose {
-            println!("Commit successful.");
-        }
+        println!("Commit successful.");
     } else {
         return Err(Box::new(Error::other("Commit message file not found")));
     }
