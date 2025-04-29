@@ -4,6 +4,13 @@
     A simple CLI tool to help you with your git workflow.
 </h1>
 
+<p align="center">
+  <a href="https://crates.io/crates/rona"><img src="https://img.shields.io/crates/v/rona.svg" alt="Crates.io Version"></a>
+  <a href="https://docs.rs/rona"><img src="https://img.shields.io/docsrs/rona/latest" alt="Documentation"></a>
+  <a href="https://github.com/TomPlanche/rona/blob/main/LICENSE"><img src="https://img.shields.io/crates/l/rona" alt="License"></a>
+  <a href="https://github.com/TomPlanche/rona/actions/workflows/rust.yaml"><img src="https://github.com/TomPlanche/rona/actions/workflows/rust.yaml/badge.svg" alt="Build Status"></a>
+</p>
+
 ## TODO:
 - [ ] Add support for `git add` with exclude patterns.
 - [ ] Add `commit_message.md` generation from git staged changes.
