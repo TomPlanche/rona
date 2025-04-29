@@ -6,7 +6,7 @@ use glob::Pattern;
 use crate::{
     git_related::{
         COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, add_files, commit, create_needed_files,
-        prepare_commit_msg,
+        get_status_files, prepare_commit_msg, push,
     },
     my_clap_theme,
 };
@@ -15,7 +15,7 @@ use crate::{
 enum Commands {
     /// Add and exclude subcommand
     /// Add all files to the git add command and exclude the files passed as positional arguments.
-    #[command(short_flag = 'a', name = "add-exclude")]
+    #[command(short_flag = 'a', name = "add-with-exclude")]
     AddWithExclude {
         /// Patterns of files to exclude (supports glob patterns like "`node_modules`/*")
         #[arg(value_name = "PATTERNS")]
@@ -35,6 +35,19 @@ enum Commands {
     /// Directly generate the `commit_message.md` file.
     #[command(short_flag = 'g')]
     Generate,
+
+    /// List files from git status (for shell completion on the -a)
+    #[command(short_flag = 'l')]
+    ListStatus,
+
+    /// Push subcommand
+    /// Push to git repository.
+    #[command(short_flag = 'p')]
+    Push {
+        /// Additionnal arguments to pass to the push command
+        #[arg(value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 #[derive(Parser)]
@@ -79,6 +92,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Commit { args } => {
             commit(&args, cli.verbose)?;
         }
+        Commands::ListStatus => {
+            let files = get_status_files()?;
+
+            // Print each file on a new line for fish shell completion
+            for file in files {
+                println!("{file}");
+            }
+        }
         Commands::Generate => {
             create_needed_files()?;
 
@@ -99,6 +120,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .spawn()
                 .expect("Error opening the file in the editor")
                 .wait();
+        }
+        Commands::Push { args } => {
+            push(&args, cli.verbose)?;
         }
     }
 

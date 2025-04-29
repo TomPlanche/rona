@@ -142,6 +142,10 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 /// # `commit`
 /// Commits files to the git repository.
 ///
+/// ## Arguments
+/// * `args` - The arguments to pass to the git commit command.
+/// * `verbose` - Whether to print verbose output.
+///
 /// ## Errors
 /// * If writing commit message fails
 /// * If git commit fails
@@ -466,6 +470,36 @@ pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
     let git_ignore_file_contents = fs::read_to_string(gitignore_file_path)?;
 
     extract_filenames(&git_ignore_file_contents, r"^([^#]\S*)$")
+}
+
+/// # `push`
+/// Pushes the changes.
+///
+/// * `args` - The arguments to pass to the git push command.
+/// * `verbose` - Whether to print verbose output.
+///
+/// ## Errors
+///
+/// ## Returns
+/// * `Result<(), Box<dyn std::error::Error>>`
+pub fn push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if verbose {
+        println!("\nPushing...");
+    }
+
+    let command = Command::new("git").arg("push").args(args).output()?;
+
+    if command.status.success() {
+        if verbose {
+            println!("Push successful");
+        }
+    } else {
+        let error_message = String::from_utf8_lossy(&command.stderr);
+
+        return Err(Box::new(Error::other(error_message)));
+    }
+
+    Ok(())
 }
 
 /// # `read_git_status`

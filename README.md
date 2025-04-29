@@ -11,12 +11,6 @@
   <a href="https://github.com/TomPlanche/rona/actions/workflows/rust.yaml"><img src="https://github.com/TomPlanche/rona/actions/workflows/rust.yaml/badge.svg" alt="Build Status"></a>
 </p>
 
-## TODO:
-- [x] Add support for `git add` with exclude patterns.
-- [ ] Add `commit_message.md` generation from git staged changes.
-- [x] Add support for `git commit` with custom message from the `commit_message.md` file.
-- [ ] Add support for `git push` with passed arguments.
-
 ## Usage
 
 ### `add-exclude` (`-a`)
@@ -74,7 +68,7 @@ A  README.md
 ?? src/utils.rs
 ```
 
-### `commit` (-c)
+### `commit` (`-c`)
 
 This command commits all changes with a custom message from the `commit_message.md` file.
 
@@ -87,7 +81,7 @@ rona -c [extra args]
 
 This will commit all changes with the message from the `commit_message.md` file.
 
-### `generate` (-g)
+### `generate` (`-g`)
 
 This command generates or updates the `commit_message.md` file with a template based on staged changes. It provides an interactive commit type selection and opens the file in your default editor.
 
@@ -105,3 +99,30 @@ The command will:
 4. Generate commit message template with staged files
 5. Open the message in your default editor (set via EDITOR env variable)
 ```
+
+### `push` (`-p`)
+
+This command pushes the committed changes to the remote repository.
+
+Example:
+```bash
+rona push [extra args]
+# or
+rona -p [extra args]
+```
+
+This will push the committed changes to the remote repository.
+
+### `list-status` (`-l`)
+
+This command lists the status of the repository.
+
+Example:
+```bash
+rona list-status
+# or
+rona -l
+```
+
+This is used with `fish` to autocomplete the `-a` command.
+See the [`rona.fish`](./completions/rona.fish) fish completion script.
