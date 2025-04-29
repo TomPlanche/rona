@@ -14,12 +14,12 @@
 ## TODO:
 - [x] Add support for `git add` with exclude patterns.
 - [ ] Add `commit_message.md` generation from git staged changes.
-- [ ] Add support for `git commit` with custom message from the `commit_message.md` file.
+- [x] Add support for `git commit` with custom message from the `commit_message.md` file.
 - [ ] Add support for `git push` with passed arguments.
 
 ## Usage
 
-### `add-exclude`
+### `add-exclude` (`-a`)
 
 This command adds all files to the git add command and excludes the files that match the passed patterns.
 
@@ -73,3 +73,15 @@ A  README.md
 ?? src/lib.rs
 ?? src/utils.rs
 ```
+### `commit` (-c)
+
+This command commits all changes with a custom message from the `commit_message.md` file.
+
+Example:
+```bash
+rona commit [extra args]
+# or
+rona -c [extra args]
+```
+
+This will commit all changes with the message from the `commit_message.md` file.

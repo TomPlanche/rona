@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand, command};
 
 use glob::Pattern;
 
-use crate::git_related::add_files;
+use crate::git_related::{add_files, commit};
 
 #[derive(Subcommand, Debug)] // TODO: Remove Debug
 enum Commands {
@@ -13,6 +13,15 @@ enum Commands {
         /// Patterns of files to exclude (supports glob patterns like "`node_modules`/*")
         #[arg(value_name = "PATTERNS")]
         exclude: Vec<String>,
+    },
+
+    /// Commit subcommand
+    /// Directly commit the file with the text in `commit_message.md`.
+    #[command(short_flag = 'c')]
+    Commit {
+        /// Additionnal arguments to pass to the commit command
+        #[arg(value_name = "ARGS")]
+        args: Vec<String>,
     },
 }
 
@@ -54,6 +63,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .collect();
 
             add_files(&patterns, cli.verbose)?;
+        }
+        Commands::Commit { args } => {
+            commit(&args, cli.verbose)?;
         }
     }
 

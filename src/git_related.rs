@@ -1,7 +1,9 @@
-use std::{collections::HashSet, io::Error, process::Command};
+use std::{collections::HashSet, fs, io::Error, path::Path, process::Command};
 
 use glob::Pattern;
 use regex::Regex;
+
+const COMMIT_MESSAGE_FILE: &str = "commit_message.md";
 
 /// # `Add files`
 /// Adds files to the git index.
@@ -51,6 +53,39 @@ pub fn add_files(
 
     if verbose {
         println!("Added {staged_count} files and excluded {excluded_count} files for commit.",);
+    }
+
+    Ok(())
+}
+
+/// # `commit`
+/// Commits files to the git repository.
+///
+/// ## Errors
+/// * If writing commit message fails
+/// * If git commit fails
+///
+/// ## Returns
+/// * `Result<(), Box<dyn std::error::Error>>`
+pub fn commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let commit_file_path = Path::new(COMMIT_MESSAGE_FILE);
+
+    if commit_file_path.exists() {
+        let file_content = fs::read_to_string(commit_file_path)?;
+
+        let final_args = &["commit", "-m", file_content.as_str()];
+
+        let command = Command::new("git").args(final_args).args(args).output();
+
+        if let Err(e) = command {
+            return Err(Box::new(Error::other(format!("Git commit failed: {e}"))));
+        }
+
+        if verbose {
+            println!("Commit successful.");
+        }
+    } else {
+        return Err(Box::new(Error::other("Commit message file not found")));
     }
 
     Ok(())
