@@ -139,7 +139,7 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
     Ok(())
 }
 
-/// # `commit`
+/// # `git_commit`
 /// Commits files to the git repository.
 ///
 /// ## Arguments
@@ -152,7 +152,7 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 ///
 /// ## Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
-pub fn commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
     if commit_file_path.exists() {
@@ -472,7 +472,7 @@ pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
     extract_filenames(&git_ignore_file_contents, r"^([^#]\S*)$")
 }
 
-/// # `push`
+/// # `git_push`
 /// Pushes the changes.
 ///
 /// * `args` - The arguments to pass to the git push command.
@@ -490,9 +490,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
     let command = Command::new("git").arg("push").args(args).output()?;
 
     if command.status.success() {
-        if verbose {
-            println!("Push successful");
-        }
+        println!("Push successful ✅");
     } else {
         let error_message = String::from_utf8_lossy(&command.stderr);
 

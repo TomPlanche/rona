@@ -5,8 +5,8 @@ use glob::Pattern;
 
 use crate::{
     git_related::{
-        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, add_files, commit, create_needed_files,
-        get_status_files, git_push, prepare_commit_msg,
+        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, add_files, create_needed_files, get_status_files,
+        git_commit, git_push, prepare_commit_msg,
     },
     my_clap_theme,
 };
@@ -94,7 +94,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             add_files(&patterns, cli.verbose)?;
         }
         Commands::Commit { args, push } => {
-            commit(&args, cli.verbose)?;
+            git_commit(&args, cli.verbose)?;
 
             if push {
                 git_push(&Vec::new(), cli.verbose)?;
