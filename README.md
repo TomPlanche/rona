@@ -43,7 +43,9 @@ rona -g  # Opens interactive commit type selector
 
 3. Commit changes:
 ```bash
-rona -c  # Commits using message from commit_message.md
+rona -c [ARGS] # Commits using message from commit_message.md
+# Push changes to remote repository
+rona -cp [ARGS] # here, the args will be passed to git commit
 ```
 
 ## Command Reference

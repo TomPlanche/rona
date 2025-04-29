@@ -482,7 +482,7 @@ pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
 ///
 /// ## Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
-pub fn push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     if verbose {
         println!("\nPushing...");
     }

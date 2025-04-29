@@ -6,12 +6,12 @@ use glob::Pattern;
 use crate::{
     git_related::{
         COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, add_files, commit, create_needed_files,
-        get_status_files, prepare_commit_msg, push,
+        get_status_files, git_push, prepare_commit_msg,
     },
     my_clap_theme,
 };
 
-#[derive(Subcommand, Debug)] // TODO: Remove Debug
+#[derive(Subcommand)]
 enum Commands {
     /// Add and exclude subcommand
     /// Add all files to the git add command and exclude the files passed as positional arguments.
@@ -29,6 +29,10 @@ enum Commands {
         /// Additionnal arguments to pass to the commit command
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
+
+        /// Wheter to push the commit after committing
+        #[arg(short = 'p', long = "push", default_value_t = false)]
+        push: bool,
     },
 
     /// Generate subcommand
@@ -54,7 +58,7 @@ enum Commands {
 #[command(about = "Simple program that can:\n\
 \t- Commit with the current 'commit_message.md' file text.\n\
 \t- Generates the 'commit_message.md' file.")]
-#[command(author = "Tom P. <tomplanche@icloud.com>")]
+#[command(author = "Tom Planche <tomplanche@proton.me>")]
 #[command(help_template = "{about}\nMade by: {author}\n\nUSAGE:\n{usage}\n\n{all-args}\n")]
 #[command(name = "rona")]
 pub struct Cli {
@@ -89,8 +93,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             add_files(&patterns, cli.verbose)?;
         }
-        Commands::Commit { args } => {
+        Commands::Commit { args, push } => {
             commit(&args, cli.verbose)?;
+
+            if push {
+                git_push(&Vec::new(), cli.verbose)?;
+            }
         }
         Commands::ListStatus => {
             let files = get_status_files()?;
@@ -122,7 +130,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .wait();
         }
         Commands::Push { args } => {
-            push(&args, cli.verbose)?;
+            git_push(&args, cli.verbose)?;
         }
     }
 
