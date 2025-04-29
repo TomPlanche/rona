@@ -120,7 +120,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             prepare_commit_msg(commit_type, cli.verbose)?;
 
-            let editor = dotenv::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+            let _ = dotenv::dotenv(); // do not fail if no `.env` file exists
+
+            let editor = std::env::var("VISUAL") // full-screen, interactive editors
+                .or_else(|_| std::env::var("EDITOR")) // simpler, line-oriented editors
+                .unwrap_or_else(|_| "nano".to_string());
 
             // Open the commit message file in the editor of the user's choice
             let _ = std::process::Command::new(editor)

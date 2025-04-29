@@ -62,9 +62,7 @@ pub fn add_files(
 
     let excluded_count = staged_files_len - files_to_add.len();
 
-    if verbose {
-        println!("Added {staged_count} files and excluded {excluded_count} files for commit.",);
-    }
+    println!("Added {staged_count} files and excluded {excluded_count} files for commit.",);
 
     Ok(())
 }
@@ -487,7 +485,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
     let command = Command::new("git").arg("push").args(args).output()?;
 
     if command.status.success() {
-        println!("Push successful ✅");
+        println!("Push successful.");
     } else {
         let error_message = String::from_utf8_lossy(&command.stderr);
 

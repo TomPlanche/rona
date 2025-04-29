@@ -13,8 +13,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
-    dotenv::dotenv().expect("Failed to load .env file");
-
     run()?;
 
     Ok(())
