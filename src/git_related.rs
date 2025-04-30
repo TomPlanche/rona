@@ -167,7 +167,7 @@ pub fn git_commit(args: &Vec<String>) -> Result<(), Box<dyn std::error::Error>> 
     if output.status.success() {
         println!("Commit successful.");
         if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout));
+            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
         }
 
         Ok(())
