@@ -27,6 +27,7 @@ Rona is a command-line interface tool designed to enhance your Git workflow with
 
 ```bash
 cargo install rona
+rona init [editor] # The editor to use for commit messages [vim, zed] (default: nano)
 ```
 
 ## Quick Start
@@ -64,6 +65,15 @@ rona -a <pattern(s)>
 rona -a "*.rs" "*.tmp"  # Exclude Rust and temporary files
 ```
 
+### `commit` (`-c`)
+Commit changes using prepared message.
+
+```bash
+rona commit [extra args]
+# or
+rona -c [-p | --push] [extra args]
+```
+
 ### `generate` (`-g`)
 Generate or update commit message template.
 
@@ -79,13 +89,20 @@ rona -g
 - Automatic file change tracking
 - Opens in default editor (set via EDITOR env variable)
 
-### `commit` (`-c`)
-Commit changes using prepared message.
+### `init` (`-i`)
+Initialize Rona configuration.
 
 ```bash
-rona commit [extra args]
+rona init [editor] # The editor to use for commit messages [vim, zed] (default: nano)
+```
+
+### `list-status` (`-l`)
+Display repository status (primarily for shell completion).
+
+```bash
+rona list-status
 # or
-rona -c [-p | --push] [extra args]
+rona -l
 ```
 
 ### `push` (`-p`)
@@ -97,13 +114,20 @@ rona push [extra args]
 rona -p [extra args]
 ```
 
-### `list-status` (`-l`)
-Display repository status (primarily for shell completion).
+### `set-editor` (`-s`)
+Set the default editor for commit messages.
 
 ```bash
-rona list-status
+rona set-editor <editor> # The editor to use for commit messages [vim, zed], no default here
+```
+
+### `help` (`-h`)
+Display help information.
+
+```bash
+rona help
 # or
-rona -l
+rona -h
 ```
 
 ## Shell Integration

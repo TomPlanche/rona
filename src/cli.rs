@@ -1,28 +1,30 @@
+use std::process::Command;
+
 use clap::{Parser, Subcommand, command};
 
 use dialoguer::Select;
 use glob::Pattern;
 
 use crate::{
+    config::Config,
     git_related::{
-        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, add_files, create_needed_files, get_status_files,
-        git_commit, git_push, prepare_commit_msg,
+        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, generate_commit_message,
+        get_status_files, git_add_with_exclude_patterns, git_commit, git_push,
     },
     my_clap_theme,
 };
 
+/// CLI's commands
 #[derive(Subcommand)]
 enum Commands {
-    /// Add and exclude subcommand
-    /// Add all files to the git add command and exclude the files passed as positional arguments.
+    /// Add all files to the `git add` command and exclude the patterns passed as positional arguments.
     #[command(short_flag = 'a', name = "add-with-exclude")]
     AddWithExclude {
-        /// Patterns of files to exclude (supports glob patterns like "`node_modules`/*")
+        /// Patterns of files to exclude (supports glob patterns like `"node_modules/*"`)
         #[arg(value_name = "PATTERNS")]
         exclude: Vec<String>,
     },
 
-    /// Commit subcommand
     /// Directly commit the file with the text in `commit_message.md`.
     #[command(short_flag = 'c')]
     Commit {
@@ -30,34 +32,50 @@ enum Commands {
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
 
-        /// Wheter to push the commit after committing
+        /// Whether to push the commit after committing
         #[arg(short = 'p', long = "push", default_value_t = false)]
         push: bool,
     },
 
-    /// Generate subcommand
     /// Directly generate the `commit_message.md` file.
     #[command(short_flag = 'g')]
     Generate,
+
+    /// Initialize the rona configuration file.
+    #[command(short_flag = 'i', name = "init")]
+    Initialize {
+        /// Editor to use for the commit message.
+        #[arg(short = 'e', long = "editor", default_value_t = String::from("nano"))]
+        editor: String,
+    },
 
     /// List files from git status (for shell completion on the -a)
     #[command(short_flag = 'l')]
     ListStatus,
 
-    /// Push subcommand
-    /// Push to git repository.
+    /// Push to a git repository.
     #[command(short_flag = 'p')]
     Push {
         /// Additionnal arguments to pass to the push command
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
     },
+
+    /// Set the editor to use for editing the commit message.
+    #[command(short_flag = 's', name = "set-editor")]
+    Set {
+        /// The editor to use for the commit message
+        #[arg(value_name = "EDITOR")]
+        editor: String,
+    },
 }
 
 #[derive(Parser)]
 #[command(about = "Simple program that can:\n\
 \t- Commit with the current 'commit_message.md' file text.\n\
-\t- Generates the 'commit_message.md' file.")]
+\t- Generate the 'commit_message.md' file.\n\
+\t- Push to git repository.\n\
+\t- Push to git repository.")]
 #[command(author = "Tom Planche <tomplanche@proton.me>")]
 #[command(help_template = "{about}\nMade by: {author}\n\nUSAGE:\n{usage}\n\n{all-args}\n")]
 #[command(name = "rona")]
@@ -84,6 +102,8 @@ pub struct Cli {
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
+    let config = Config::new()?;
+
     match cli.command {
         Commands::AddWithExclude { exclude } => {
             let patterns: Vec<Pattern> = exclude
@@ -91,7 +111,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|p| Pattern::new(p).expect("Invalid glob pattern"))
                 .collect();
 
-            add_files(&patterns, cli.verbose)?;
+            git_add_with_exclude_patterns(&patterns, cli.verbose)?;
         }
         Commands::Commit { args, push } => {
             git_commit(&args, cli.verbose)?;
@@ -118,23 +138,25 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .interact()
                     .unwrap()];
 
-            prepare_commit_msg(commit_type, cli.verbose)?;
+            generate_commit_message(commit_type, cli.verbose)?;
 
-            let _ = dotenv::dotenv(); // do not fail if no `.env` file exists
+            let editor = config.get_editor()?;
 
-            let editor = std::env::var("VISUAL") // full-screen, interactive editors
-                .or_else(|_| std::env::var("EDITOR")) // simpler, line-oriented editors
-                .unwrap_or_else(|_| "nano".to_string());
-
-            // Open the commit message file in the editor of the user's choice
-            let _ = std::process::Command::new(editor)
+            Command::new(editor)
                 .arg(COMMIT_MESSAGE_FILE_PATH)
                 .spawn()
-                .expect("Error opening the file in the editor")
-                .wait();
+                .expect("Failed to spawn editor")
+                .wait()
+                .expect("Failed to wait for editor");
+        }
+        Commands::Initialize { editor } => {
+            config.create_config_file(&editor)?;
         }
         Commands::Push { args } => {
             git_push(&args, cli.verbose)?;
+        }
+        Commands::Set { editor } => {
+            config.set_editor(&editor)?;
         }
     }
 

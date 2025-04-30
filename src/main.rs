@@ -1,6 +1,15 @@
+pub mod cli;
+pub mod config;
+pub mod git_related;
+pub mod my_clap_theme;
+pub mod utils;
+
 use std::{error::Error, path::Path};
 
-use rona::{GIT_ROOT, cli::run, utils::print_error};
+use cli::run;
+use utils::print_error;
+
+const GIT_ROOT: &str = ".git";
 
 fn main() {
     if !Path::new(GIT_ROOT).exists() {
@@ -13,13 +22,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    if let Err(e) = inner_main() {
-        print_error(
-            "Error occurred",
-            &format!("An error occurred: {e}"),
-            "Please check the error message for more details.",
-        );
-
+    if inner_main().is_err() {
         std::process::exit(1);
     }
 }

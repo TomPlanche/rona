@@ -173,7 +173,7 @@ pub fn format_list<T: Display>(items: &[T]) -> String {
 ///
 /// ## Errors
 /// Returns an error if:
-/// * The file path is invalid (empty or has invalid parent)
+/// * The file path is invalid (empty or has an invalid parent)
 /// * The folder path is invalid or empty
 /// * Either path cannot be converted to a canonical form
 ///

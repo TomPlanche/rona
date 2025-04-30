@@ -22,7 +22,7 @@ pub struct ColorfulTheme {
     pub success_suffix: StyledObject<String>,
     /// Error prefix value and style
     pub error_prefix: StyledObject<String>,
-    /// The style for error message
+    /// The style for an error message
     pub error_style: Style,
     /// The style for hints
     pub hint_style: Style,
@@ -36,9 +36,9 @@ pub struct ColorfulTheme {
     pub active_item_prefix: StyledObject<String>,
     /// Inctive item in select prefix value and style
     pub inactive_item_prefix: StyledObject<String>,
-    /// Checked item in multi select prefix value and style
+    /// Checked item in multi-select prefix value and style
     pub checked_item_prefix: StyledObject<String>,
-    /// Unchecked item in multi select prefix value and style
+    /// Unchecked item in multi-select prefix value and style
     pub unchecked_item_prefix: StyledObject<String>,
     /// Picked item in sort prefix value and style
     pub picked_item_prefix: StyledObject<String>,
@@ -141,7 +141,7 @@ impl dialoguer::theme::Theme for ColorfulTheme {
         }
     }
 
-    /// Formats a confirm prompt after selection.
+    /// Formats a confirmation prompt after selection.
     fn format_confirm_prompt_selection(
         &self,
         f: &mut dyn fmt::Write,

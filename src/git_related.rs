@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    fs::{self, File, OpenOptions, read_to_string, write},
+    fs::{File, OpenOptions, read_to_string, write},
     io::{Error, Write},
     path::Path,
     process::Command,
@@ -9,63 +9,12 @@ use std::{
 use glob::Pattern;
 use regex::Regex;
 
-use crate::utils::{check_for_file_in_folder, print_error};
+use crate::{print_error, utils::check_for_file_in_folder};
 
 pub const COMMIT_MESSAGE_FILE_PATH: &str = "commit_message.md";
 pub const COMMIT_TYPES: [&str; 4] = ["chore", "feat", "fix", "test"];
 const COMMITIGNORE_FILE_PATH: &str = ".commitignore";
 const GITIGNORE_FILE_PATH: &str = ".gitignore";
-
-/// # `Add files`
-/// Adds files to the git index.
-///
-/// ## Errors
-/// * If reading git status fails
-/// * If adding files to git fails
-/// * If getting git staged information fails
-///
-/// ## Arguments
-/// * `exclude_patterns` - List of patterns to exclude
-/// * `verbose` - Whether to print verbose output
-///
-/// ## Returns
-/// * `Result<(), Error>` - Result of the operation
-pub fn add_files(
-    exclude_patterns: &[Pattern],
-    verbose: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if verbose {
-        println!("Adding files...");
-    }
-
-    let staged_files = get_status_files()?;
-    let staged_files_len = staged_files.len();
-
-    let files_to_add: Vec<String> = staged_files
-        .into_iter()
-        .filter(|file| {
-            // If file matches any pattern, exclude it
-            !exclude_patterns.iter().any(|pattern| pattern.matches(file))
-        })
-        .collect();
-
-    let _ = Command::new("git")
-        .arg("add")
-        .args(&files_to_add)
-        .output()?;
-
-    let staged = Command::new("git")
-        .args(["diff", "--cached", "--numstat"])
-        .output()?;
-
-    let staged_count = String::from_utf8_lossy(&staged.stdout).lines().count();
-
-    let excluded_count = staged_files_len - files_to_add.len();
-
-    println!("Added {staged_count} files and excluded {excluded_count} files for commit.",);
-
-    Ok(())
-}
 
 /// # `add_to_git_exclude`
 /// Add paths to the `.git/info/exclude` file.
@@ -115,13 +64,13 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
         return Ok(());
     }
 
-    // Open file in append mode
+    // Open a file in `append` and `create` mode
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(exclude_file)?;
 
-    // Add marker if it's not already there
+    // Add a marker if it's not already there
     if !content.contains("# Added by git-commit-rust") {
         if !content.is_empty() {
             writeln!(file)?;
@@ -138,7 +87,7 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 }
 
 /// # `create_needed_files`
-/// Creates the needed files in the project root.
+/// Creates the necessary files in the project root.
 ///
 /// ## Errors
 /// * If the files cannot be created.
@@ -162,7 +111,7 @@ pub fn create_needed_files() -> Result<(), Box<dyn std::error::Error>> {
 
 /// # `format_branch_name`
 /// Formats the branch name.
-/// If the branch name contains a `COMMIT_TYPES` it will be removed.
+/// If the branch name contains a `COMMIT_TYPES`, it will be removed.
 ///
 /// ## Arguments
 /// * `commit_types` - `&[&str; 4]` - The commit types
@@ -203,7 +152,11 @@ pub fn get_current_branch() -> Result<String, Error> {
     // Convert the output to a string
     let output_str = String::from_utf8_lossy(&output.stdout);
 
-    Ok(output_str.trim().to_string())
+    if output_str.trim().is_empty() {
+        Err(Error::other("No branch found"))
+    } else {
+        Ok(output_str.trim().to_string())
+    }
 }
 
 /// # `get_current_commit_nb`
@@ -230,13 +183,114 @@ pub fn get_current_commit_nb() -> Result<u16, Error> {
     Ok(commit_count)
 }
 
+/// # `git_add_with_exclude_patterns`
+/// Adds files to the git index.
+///
+/// ## Errors
+/// * If reading git status fails
+/// * If adding files to git fails
+/// * If getting git staged information fails
+///
+/// ## Examples
+/// ```no_run
+/// use std::error::Error;
+/// use glob::Pattern;
+///
+/// // Exclude all Rust source files
+/// let patterns = vec![Pattern::new("*.rs").unwrap()];
+/// git_add_with_exclude_patterns(&patterns, true)?;
+///
+/// // Exclude an entire directory
+/// let patterns = vec![Pattern::new("target/**/*").unwrap()];
+/// git_add_with_exclude_patterns(&patterns, false)?;
+///
+/// // Multiple exclusion patterns
+/// let patterns = vec![
+///     Pattern::new("*.log").unwrap(),
+///     Pattern::new("temp/*").unwrap(),
+///     Pattern::new("**/*.tmp").unwrap()
+/// ];
+/// git_add_with_exclude_patterns(&patterns, true)?;
+///
+/// // Complex wildcard pattern
+/// let patterns = vec![Pattern::new("src/**/*_test.{rs,txt}").unwrap()];
+/// git_add_with_exclude_patterns(&patterns, false)?;
+///
+/// // No exclusions (empty pattern list)
+/// let patterns = vec![];
+/// git_add_with_exclude_patterns(&patterns, true)?;
+///
+/// // Pattern with special characters
+/// let patterns = vec![Pattern::new("[abc]*.rs").unwrap()];
+/// git_add_with_exclude_patterns(&patterns, false)?;
+///
+/// // Error handling example
+/// fn handle_git_add() -> Result<(), Box<dyn Error>> {
+///     let patterns = vec![Pattern::new("*.rs")?];
+///     git_add_with_exclude_patterns(&patterns, true)?;
+///     Ok(())
+/// }
+/// ```
+///
+/// In these examples:
+/// - `"*.rs"` excludes all Rust source files
+/// - `"target/**/*"` excludes everything in the target directory and subdirectories
+/// - Multiple patterns show how to exclude logs, temp files, and .tmp files
+/// - `"src/**/*_test.{rs,txt}"` excludes test files with .rs or .txt extensions in src/
+/// - Empty vector shows how to add all files without exclusions
+/// - `"[abc]*.rs"` excludes Rust files starting with a, b, or c
+/// - Error handling shows proper pattern creation with error propagation
+///
+/// ## Arguments
+/// * `exclude_patterns` - List of patterns to exclude
+/// * `verbose` - Whether to print verbose output
+///
+/// ## Returns
+/// * `Result<(), Error>` - Result of the operation
+pub fn git_add_with_exclude_patterns(
+    exclude_patterns: &[Pattern],
+    verbose: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if verbose {
+        println!("Adding files...");
+    }
+
+    let staged_files = get_status_files()?;
+    let staged_files_len = staged_files.len();
+
+    let files_to_add: Vec<String> = staged_files
+        .into_iter()
+        .filter(|file| {
+            // If a file matches any pattern, exclude it
+            !exclude_patterns.iter().any(|pattern| pattern.matches(file))
+        })
+        .collect();
+
+    let _ = Command::new("git")
+        .arg("add")
+        .args(&files_to_add)
+        .output()?;
+
+    let staged = Command::new("git")
+        .args(["diff", "--cached", "--numstat"])
+        .output()?;
+
+    let staged_count = String::from_utf8_lossy(&staged.stdout).lines().count();
+
+    let excluded_count = staged_files_len - files_to_add.len();
+
+    println!("Added {staged_count} files and excluded {excluded_count} files for commit.",);
+
+    Ok(())
+}
+
 /// # `get_status_files`
 /// Returns a list of all files that appear in git status
 /// (modified, untracked, staged - but not deleted)
 ///
 /// ## Errors
 /// * If reading git status fails
-/// * If regex pattern fails to compile
+/// * If a regex pattern fails to compile
 ///
 /// ## Returns
 /// * `Vec<String>` - List of files from git status
@@ -298,7 +352,7 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::
         return Err(Box::new(Error::other("Commit message file not found")));
     }
 
-    let file_content = fs::read_to_string(commit_file_path)?;
+    let file_content = read_to_string(commit_file_path)?;
     let output = Command::new("git")
         .arg("commit")
         .arg("-m")
@@ -375,9 +429,9 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
     }
 }
 
-/// # `prepare_commit_msg`
+/// # `generate_commit_message`
 /// Prepares the commit message.
-/// It creates the commit message file and empty it if it already exists.
+/// It creates the commit message file and empties it if it already exists.
 /// It also adds the modified / added files to the commit message file.
 ///
 /// ## Errors
@@ -389,7 +443,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
 /// ## Arguments
 /// * `commit_types` - `&str` - The commit types
 /// * `verbose` - `bool` - Verbose the operation
-pub fn prepare_commit_msg(commit_type: &str, verbose: bool) -> Result<(), Error> {
+pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<(), Error> {
     let commit_message_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
     let commitignore_path = Path::new(COMMITIGNORE_FILE_PATH);
 
@@ -432,12 +486,12 @@ pub fn prepare_commit_msg(commit_type: &str, verbose: bool) -> Result<(), Error>
             // This variable is used to call the 'continue' statement
             // just before the 'writeln!' macro.
             // I can't use the 'continue' statement directly in the for loop
-            // because it will skip the next item, not file.
+            // because it will skip the next item, not a file.
             let mut need_to_skip = false;
 
             // for each item in the commitignore file and gitignore file,
-            // check for file in the folder
-            // for example:
+            // check for a file in the folder,
+            // for example,
             // `data/year_2015/puzzles/` in the commitignore file can
             // exclude `data/year_2015/puzzles/day_01.md` from the commit
             // and in general `data/year_2015/puzzles/*` from the commit
@@ -497,7 +551,7 @@ pub fn process_deleted_files(message: &str) -> Result<Vec<String>, Error> {
 
 /// # `process_git_status`
 /// Processes the git status.
-/// It will parse the git status in order to prepare the git commit message.
+/// It will parse the git status to prepare the git commit message.
 ///
 /// ## Arguments
 /// * `message` - The git status output string
@@ -530,7 +584,7 @@ pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
         return Ok(Vec::new());
     }
 
-    let git_ignore_file_contents = fs::read_to_string(gitignore_file_path)?;
+    let git_ignore_file_contents = read_to_string(gitignore_file_path)?;
 
     extract_filenames(&git_ignore_file_contents, r"^([^#]\S*)$")
 }
@@ -556,7 +610,7 @@ pub fn read_git_status() -> Result<String, Error> {
     } else {
         let error_message = String::from_utf8_lossy(&command.stderr);
 
-        Err(std::io::Error::new(
+        Err(Error::new(
             std::io::ErrorKind::InvalidData,
             format!("`read_git_status` failed: {error_message}"),
         ))
@@ -573,10 +627,10 @@ pub fn read_git_status() -> Result<String, Error> {
 /// ## Returns
 /// * `Result<Vec<String>, String>` - The extracted filenames or an error message
 fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>, Error> {
-    let regex = regex::Regex::new(pattern);
+    let regex = Regex::new(pattern);
 
     if regex.is_err() {
-        return Err(std::io::Error::new(
+        return Err(Error::new(
             std::io::ErrorKind::InvalidData,
             format!("`extract_filenames` failed to compile regex pattern: {pattern}"),
         ));
