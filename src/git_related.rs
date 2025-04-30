@@ -255,6 +255,9 @@ pub fn git_add_with_exclude_patterns(
         println!("Adding files...");
     }
 
+    let git_status = read_git_status()?;
+    let deleted_files = process_deleted_files(&git_status)?;
+
     let staged_files = get_status_files()?;
     let staged_files_len = staged_files.len();
 
@@ -269,6 +272,7 @@ pub fn git_add_with_exclude_patterns(
     let _ = Command::new("git")
         .arg("add")
         .args(&files_to_add)
+        .args(&deleted_files)
         .output()?;
 
     let staged = Command::new("git")
