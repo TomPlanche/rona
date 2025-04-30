@@ -50,9 +50,7 @@ rona -cp [ARGS] # here, the args will be passed to git commit
 
 ## Command Reference
 
-### File Management
-
-#### `add-with-exclude` (`-a`)
+### `add-with-exclude` (`-a`)
 Add files to Git staging while excluding specified patterns.
 
 ```bash
@@ -66,9 +64,7 @@ rona -a <pattern(s)>
 rona -a "*.rs" "*.tmp"  # Exclude Rust and temporary files
 ```
 
-### Commit Management
-
-#### `generate` (`-g`)
+### `generate` (`-g`)
 Generate or update commit message template.
 
 ```bash
@@ -83,18 +79,16 @@ rona -g
 - Automatic file change tracking
 - Opens in default editor (set via EDITOR env variable)
 
-#### `commit` (`-c`)
+### `commit` (`-c`)
 Commit changes using prepared message.
 
 ```bash
 rona commit [extra args]
 # or
-rona -c [extra args]
+rona -c [-p | --push] [extra args]
 ```
 
-### Repository Operations
-
-#### `push` (`-p`)
+### `push` (`-p`)
 Push committed changes to remote repository.
 
 ```bash
@@ -103,7 +97,7 @@ rona push [extra args]
 rona -p [extra args]
 ```
 
-#### `list-status` (`-l`)
+### `list-status` (`-l`)
 Display repository status (primarily for shell completion).
 
 ```bash

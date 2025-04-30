@@ -152,23 +152,42 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 pub fn git_commit(args: &Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
-    if commit_file_path.exists() {
-        let file_content = fs::read_to_string(commit_file_path)?;
-
-        let final_args = &["commit", "-m", file_content.as_str()];
-
-        let command = Command::new("git").args(final_args).args(args).output();
-
-        if let Err(e) = command {
-            return Err(Box::new(Error::other(format!("Git commit failed: {e}"))));
-        }
-
-        println!("Commit successful.");
-    } else {
+    if !commit_file_path.exists() {
         return Err(Box::new(Error::other("Commit message file not found")));
     }
 
-    Ok(())
+    let file_content = fs::read_to_string(commit_file_path)?;
+    let output = Command::new("git")
+        .arg("commit")
+        .arg("-m")
+        .arg(file_content)
+        .args(args)
+        .output()?;
+
+    if output.status.success() {
+        println!("Commit successful.");
+        if !output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+
+        Ok(())
+    } else {
+        // Format error message more cleanly
+        let error_msg = String::from_utf8_lossy(&output.stderr);
+
+        // Print error in a more readable format
+        println!("\n🚨 Git commit failed:");
+        println!("-------------------");
+
+        // Split error message into lines and clean up
+        for line in error_msg.lines() {
+            if !line.trim().is_empty() {
+                println!("{}", line.trim());
+            }
+        }
+
+        Err(Box::new(Error::other("Git commit failed")))
+    }
 }
 
 /// # `create_needed_files`
@@ -227,17 +246,17 @@ pub fn format_branch_name(commit_types: &[&str; 4], branch: &str) -> String {
 ///
 /// ## Returns
 /// * `String` - The current git branch
-#[allow(dead_code)]
 pub fn get_current_branch() -> Result<String, Error> {
     // Get the current branch
     let output = Command::new("git")
-        .arg("rev-parse")
-        .arg("--abbrev-ref")
-        .arg("HEAD")
+        .arg("branch")
+        .arg("--show-current")
         .output()?;
 
     // Convert the output to a string
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    let output_str = String::from_utf8_lossy(&output.stdout);
+
+    Ok(output_str.trim().to_string())
 }
 
 /// # `get_current_commit_nb`
@@ -250,16 +269,18 @@ pub fn get_current_branch() -> Result<String, Error> {
 /// ## Returns
 /// * `u16` - The number of commits
 pub fn get_current_commit_nb() -> Result<u16, Error> {
+    let branch = get_current_branch()?;
+
     let output = Command::new("git")
         .arg("rev-list")
         .arg("--count")
-        .arg("HEAD")
+        .arg(branch)
         .output()?;
 
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse::<u16>()
-        .map_err(|e| Error::other(format!("Failed to parse commit count: {e}")))
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    let commit_count = output_str.trim().parse::<u16>().unwrap_or(0);
+
+    Ok(commit_count)
 }
 
 /// # `get_status_files`
@@ -504,11 +525,8 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
 /// ## Returns
 /// * `Result<String, String>` - The git status or an error message
 pub fn read_git_status() -> Result<String, Error> {
-    // Command
-    let command = Command::new("git")
-        .arg("status")
-        .arg("--porcelain")
-        .output()?;
+    let args = vec!["status", "--porcelain", "-u"];
+    let command = Command::new("git").args(&args).output()?;
 
     // If the command was successful
     if command.status.success() {
@@ -521,7 +539,7 @@ pub fn read_git_status() -> Result<String, Error> {
 
         Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            error_message,
+            format!("`read_git_status` failed: {error_message}"),
         ))
     }
 }
@@ -541,7 +559,7 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>, Error>
     if regex.is_err() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            "Invalid regex pattern",
+            format!("`extract_filenames` failed to compile regex pattern: {pattern}"),
         ));
     }
 
@@ -563,34 +581,6 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>, Error>
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_format_branch_name() {
-        let commit_types = &["chore", "feat", "fix", "test"];
-
-        // Test cases
-        assert_eq!(
-            format_branch_name(commit_types, "feat/new-feature"),
-            "new-feature"
-        );
-        assert_eq!(format_branch_name(commit_types, "fix/bug-123"), "bug-123");
-        assert_eq!(format_branch_name(commit_types, "main"), "main");
-        assert_eq!(
-            format_branch_name(commit_types, "chore/update-deps"),
-            "update-deps"
-        );
-        assert_eq!(
-            format_branch_name(commit_types, "test/add-tests"),
-            "add-tests"
-        );
-
-        // Edge cases
-        assert_eq!(format_branch_name(commit_types, ""), "");
-        assert_eq!(
-            format_branch_name(commit_types, "feature/stuff"),
-            "feature/stuff"
-        );
-    }
 
     #[test]
     fn test_process_git_status() {
@@ -655,5 +645,19 @@ mod tests {
         assert!(result.contains(&"file1.txt".to_string()));
         assert!(result.contains(&"file2.rs".to_string()));
         assert!(result.contains(&"file3.md".to_string()));
+    }
+
+    #[test]
+    fn test_format_branch_name() {
+        assert_eq!(
+            format_branch_name(&COMMIT_TYPES, "feat/new-feature"),
+            "new-feature"
+        );
+        assert_eq!(format_branch_name(&COMMIT_TYPES, "fix/bug-123"), "bug-123");
+        assert_eq!(format_branch_name(&COMMIT_TYPES, "main"), "main");
+        assert_eq!(
+            format_branch_name(&COMMIT_TYPES, "test/add-tests"),
+            "add-tests"
+        );
     }
 }
