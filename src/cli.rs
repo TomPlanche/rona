@@ -143,30 +143,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod cli_tests {
-    use std::{fs::write, process::Command};
-
     use super::*;
     use clap::Parser;
-    use tempfile::TempDir;
-
-    fn setup_git_repo() -> TempDir {
-        let temp_dir = TempDir::new().unwrap();
-        let _ = Command::new("git")
-            .arg("init")
-            .current_dir(&temp_dir)
-            .output()
-            .unwrap();
-        temp_dir
-    }
 
     #[test]
     fn test_add_with_exclude_command() {
-        let temp_dir = setup_git_repo();
-
-        // Create test files
-        write(temp_dir.path().join("test.rs"), "").unwrap();
-        write(temp_dir.path().join("test.txt"), "").unwrap();
-
         let args = vec!["rona", "-a", "*.txt"];
         let cli = Cli::try_parse_from(args).unwrap();
 
