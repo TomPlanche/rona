@@ -94,7 +94,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             add_files(&patterns, cli.verbose)?;
         }
         Commands::Commit { args, push } => {
-            git_commit(&args)?;
+            git_commit(&args, cli.verbose)?;
 
             if push {
                 git_push(&Vec::new(), cli.verbose)?;

@@ -137,59 +137,6 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
     Ok(())
 }
 
-/// # `git_commit`
-/// Commits files to the git repository.
-///
-/// ## Arguments
-/// * `args` - The arguments to pass to the git commit command.
-///
-/// ## Errors
-/// * If writing commit message fails
-/// * If git commit fails
-///
-/// ## Returns
-/// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_commit(args: &Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-    let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
-
-    if !commit_file_path.exists() {
-        return Err(Box::new(Error::other("Commit message file not found")));
-    }
-
-    let file_content = fs::read_to_string(commit_file_path)?;
-    let output = Command::new("git")
-        .arg("commit")
-        .arg("-m")
-        .arg(file_content)
-        .args(args)
-        .output()?;
-
-    if output.status.success() {
-        println!("Commit successful.");
-        if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
-        }
-
-        Ok(())
-    } else {
-        // Format error message more cleanly
-        let error_msg = String::from_utf8_lossy(&output.stderr);
-
-        // Print error in a more readable format
-        println!("\n🚨 Git commit failed:");
-        println!("-------------------");
-
-        // Split error message into lines and clean up
-        for line in error_msg.lines() {
-            if !line.trim().is_empty() {
-                println!("{}", line.trim());
-            }
-        }
-
-        Err(Box::new(Error::other("Git commit failed")))
-    }
-}
-
 /// # `create_needed_files`
 /// Creates the needed files in the project root.
 ///
@@ -326,6 +273,106 @@ pub fn get_status_files() -> Result<Vec<String>, Box<dyn std::error::Error>> {
         .collect();
 
     Ok(files.into_iter().collect())
+}
+
+/// # `git_commit`
+/// Commits files to the git repository.
+///
+/// ## Arguments
+/// * `args` - The arguments to pass to the git commit command.
+///
+/// ## Errors
+/// * If writing commit message fails
+/// * If git commit fails
+///
+/// ## Returns
+/// * `Result<(), Box<dyn std::error::Error>>`
+pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if verbose {
+        println!("Committing files...");
+    }
+
+    let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
+
+    if !commit_file_path.exists() {
+        return Err(Box::new(Error::other("Commit message file not found")));
+    }
+
+    let file_content = fs::read_to_string(commit_file_path)?;
+    let output = Command::new("git")
+        .arg("commit")
+        .arg("-m")
+        .arg(file_content)
+        .args(args)
+        .output()?;
+
+    if output.status.success() {
+        if verbose {
+            println!("Commit successful!");
+        }
+
+        if !output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
+        }
+
+        Ok(())
+    } else {
+        let error_message = String::from_utf8_lossy(&output.stderr);
+
+        println!("\n🚨 Git commit failed:");
+        println!("-------------------");
+
+        for line in error_message.lines() {
+            if !line.trim().is_empty() {
+                println!("{}", line.trim());
+            }
+        }
+
+        Err(Box::new(Error::other("Git commit failed")))
+    }
+}
+
+/// # `git_push`
+/// Pushes the changes.
+///
+/// * `args` - The arguments to pass to the git push command.
+/// * `verbose` - Whether to print verbose output.
+///
+/// ## Errors
+///
+/// ## Returns
+/// * `Result<(), Box<dyn std::error::Error>>`
+pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if verbose {
+        println!("\nPushing...");
+    }
+
+    let output = Command::new("git").arg("push").args(args).output()?;
+
+    if output.status.success() {
+        if verbose {
+            println!("Push successful.");
+        }
+
+        if !output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
+        }
+
+        Ok(())
+    } else {
+        let error_message = String::from_utf8_lossy(&output.stderr);
+
+        println!("\n 🚨 Git push failed");
+        println!("-------------------");
+
+        for line in error_message.lines() {
+            if !line.trim().is_empty() {
+                println!("{}", line.trim());
+            }
+        }
+
+        Err(Box::new(Error::other("Git commit failed")))
+    }
 }
 
 /// # `prepare_commit_msg`
@@ -486,34 +533,6 @@ pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
     let git_ignore_file_contents = fs::read_to_string(gitignore_file_path)?;
 
     extract_filenames(&git_ignore_file_contents, r"^([^#]\S*)$")
-}
-
-/// # `git_push`
-/// Pushes the changes.
-///
-/// * `args` - The arguments to pass to the git push command.
-/// * `verbose` - Whether to print verbose output.
-///
-/// ## Errors
-///
-/// ## Returns
-/// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
-    if verbose {
-        println!("\nPushing...");
-    }
-
-    let command = Command::new("git").arg("push").args(args).output()?;
-
-    if command.status.success() {
-        println!("Push successful.");
-    } else {
-        let error_message = String::from_utf8_lossy(&command.stderr);
-
-        return Err(Box::new(Error::other(error_message)));
-    }
-
-    Ok(())
 }
 
 /// # `read_git_status`
