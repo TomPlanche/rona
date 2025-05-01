@@ -121,7 +121,7 @@ pub fn create_needed_files() -> Result<()> {
 /// # Returns
 /// - `Ok(PathBuf)` - Path to the git repository root
 /// - `Err` - If not in a git repository or other errors occur
-pub fn find_git_root() -> io::Result<PathBuf> {
+pub fn find_git_root() -> Result<PathBuf> {
     let output = Command::new("git")
         .args(["rev-parse", "--git-dir"])
         .output()?;
@@ -132,16 +132,10 @@ pub fn find_git_root() -> io::Result<PathBuf> {
         if git_root.exists() {
             Ok(git_root)
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Git root not found",
-            ))
+            Err(Error::new(io::ErrorKind::NotFound, "Git root not found"))
         }
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "Git root not found",
-        ))
+        Err(Error::new(io::ErrorKind::NotFound, "Git root not found"))
     }
 }
 
@@ -352,7 +346,7 @@ pub fn get_status_files() -> Result<Vec<String>> {
     //  D file.txt
     // AD file.txt
     let regex_rule = Regex::new(r"^[MARCU? ][MARCU? ]\s(.*)$")
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+        .map_err(|e| Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
 
     // Use a HashSet to avoid duplicates
     let files: HashSet<String> = status
@@ -676,7 +670,7 @@ pub fn read_git_status() -> Result<String> {
         let error_message = String::from_utf8_lossy(&command.stderr);
 
         Err(Error::new(
-            std::io::ErrorKind::InvalidData,
+            io::ErrorKind::InvalidData,
             format!("`read_git_status` failed: {error_message}"),
         ))
     }
@@ -696,7 +690,7 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
 
     if regex.is_err() {
         return Err(Error::new(
-            std::io::ErrorKind::InvalidData,
+            io::ErrorKind::InvalidData,
             format!("`extract_filenames` failed to compile regex pattern: {pattern}"),
         ));
     }
@@ -718,6 +712,10 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use tempfile::Builder;
+
     use super::*;
 
     #[test]
@@ -797,5 +795,65 @@ mod tests {
             format_branch_name(&COMMIT_TYPES, "test/add-tests"),
             "add-tests"
         );
+    }
+
+    // Helper function to initialize a git repository
+    fn init_git_repo(path: &Path) {
+        Command::new("git")
+            .args(["init"])
+            .current_dir(path)
+            .output()
+            .expect("Failed to initialize git repository");
+    }
+
+    #[test]
+    fn test_no_git_repository() {
+        let temp_dir = Builder::new()
+            .prefix("rona-test")
+            .tempdir()
+            .expect("Failed to create temp directory");
+
+        // Change to temp directory and try to find git root
+        std::env::set_current_dir(&temp_dir).expect("Failed to change directory");
+
+        assert!(find_git_root().is_err());
+    }
+
+    #[test]
+    fn test_basic_git_repository() {
+        let temp_dir = Builder::new()
+            .prefix("rona-test")
+            .tempdir()
+            .expect("Failed to create temp directory");
+
+        init_git_repo(temp_dir.path());
+
+        // Test from the repository root
+        std::env::set_current_dir(&temp_dir).expect("Failed to change directory");
+        let root = find_git_root().expect("Failed to find git root");
+        assert!(root.ends_with(".git"));
+
+        // Test from a subdirectory
+        fs::create_dir_all(temp_dir.path().join("src/nested"))
+            .expect("Failed to create nested dirs");
+        std::env::set_current_dir(temp_dir.path().join("src/nested"))
+            .expect("Failed to change directory");
+        let root_from_nested =
+            find_git_root().expect("Failed to find git root from nested directory");
+        assert!(root_from_nested.ends_with(".git"));
+    }
+
+    #[test]
+    fn test_corrupted_git_directory() {
+        let temp_dir = Builder::new()
+            .prefix("rona-test")
+            .tempdir()
+            .expect("Failed to create temp directory");
+
+        // Create a .git directory but don't initialize it properly
+        fs::create_dir(temp_dir.path().join(".git")).expect("Failed to create .git directory");
+
+        std::env::set_current_dir(&temp_dir).expect("Failed to change directory");
+        assert!(find_git_root().is_err());
     }
 }
