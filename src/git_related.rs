@@ -1,8 +1,9 @@
 use std::{
     collections::HashSet,
-    fs::{File, OpenOptions, read_to_string, write},
-    io::{Error, Write},
-    path::Path,
+    env,
+    fs::{self, File, OpenOptions, read_to_string, write},
+    io::{Error, ErrorKind, Write},
+    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -28,7 +29,9 @@ const GITIGNORE_FILE_PATH: &str = ".gitignore";
 ///
 /// ## Returns * `Result<(), std::io::Error>` - Result of the operation.
 pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
-    let exclude_file = Path::new(".git").join("info").join("exclude");
+    let git_root_path = find_git_root()?;
+
+    let exclude_file = git_root_path.join("info").join("exclude");
 
     if !exclude_file.exists() {
         print_error(
@@ -107,6 +110,54 @@ pub fn create_needed_files() -> Result<(), Box<dyn std::error::Error>> {
     add_to_git_exclude(&[COMMIT_MESSAGE_FILE_PATH, COMMITIGNORE_FILE_PATH])?;
 
     Ok(())
+}
+
+/// Finds the root directory of the git repository by traversing up the directory tree
+/// until it finds a .git directory or file.
+///
+/// # Returns
+/// - `Ok(PathBuf)` - Path to the git repository root
+/// - `Err` - If not in a git repository or other errors occur
+///
+/// # Errors
+/// - If not in a git repository
+/// - If unable to access directories
+pub fn find_git_root() -> Result<PathBuf, Error> {
+    let mut current_path = env::current_dir()?;
+
+    loop {
+        let git_path = current_path.join(".git");
+
+        if git_path.is_dir() {
+            return Ok(git_path);
+        }
+
+        if git_path.is_file() {
+            // Submodule case
+            let content = fs::read_to_string(&git_path)?;
+            let gitdir_path = content
+                .trim()
+                .strip_prefix("gitdir: ")
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Invalid gitdir format"))?;
+
+            let absolute_gitdir = if Path::new(gitdir_path).is_absolute() {
+                PathBuf::from(gitdir_path)
+            } else {
+                current_path.join(gitdir_path)
+            };
+
+            // Get parent of .git directory
+            return Ok(absolute_gitdir.canonicalize()?.to_path_buf());
+        }
+
+        // Move up one directory
+        if !current_path.pop() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                "Not inside a git repository",
+            ));
+        }
+    }
 }
 
 /// # `format_branch_name`
