@@ -4,7 +4,7 @@ pub mod git_related;
 pub mod my_clap_theme;
 pub mod utils;
 
-use std::error::Error;
+use std::{error::Error, process::exit};
 
 use cli::run;
 use git_related::find_git_root;
@@ -17,11 +17,18 @@ fn main() {
             "Could not find a git repository in this directory or any parent directories.",
             "Please ensure you're in a Git repository.",
         );
-        std::process::exit(1);
+
+        exit(1);
     }
 
-    if inner_main().is_err() {
-        std::process::exit(1);
+    let result = inner_main();
+    if result.is_err() {
+        println!(
+            "Rona error:\n{}",
+            result.expect_err("Cannot unwrap Rona's error")
+        );
+
+        exit(1);
     }
 }
 
