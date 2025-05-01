@@ -1,8 +1,7 @@
 use std::{
     collections::HashSet,
-    env,
     fs::{self, File, OpenOptions, read_to_string, write},
-    io::{Error, ErrorKind, Write},
+    io::{self, Error, ErrorKind, Result, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -28,7 +27,7 @@ const GITIGNORE_FILE_PATH: &str = ".gitignore";
 /// * If the file cannot be read/opened/written to.
 ///
 /// ## Returns * `Result<(), std::io::Error>` - Result of the operation.
-pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
+pub fn add_to_git_exclude(paths: &[&str]) -> Result<()> {
     let git_root_path = find_git_root()?;
 
     let exclude_file = git_root_path.join("info").join("exclude");
@@ -95,7 +94,7 @@ pub fn add_to_git_exclude(paths: &[&str]) -> std::io::Result<()> {
 /// ## Errors
 /// * If the files cannot be created.
 /// * If the git add command fails.
-pub fn create_needed_files() -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_needed_files() -> Result<()> {
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
     let commitignore_file_path = Path::new(COMMITIGNORE_FILE_PATH);
 
@@ -115,18 +114,18 @@ pub fn create_needed_files() -> Result<(), Box<dyn std::error::Error>> {
 /// Finds the root directory of the git repository by traversing up the directory tree
 /// until it finds a .git directory or file.
 ///
-/// # Returns
-/// - `Ok(PathBuf)` - Path to the git repository root
-/// - `Err` - If not in a git repository or other errors occur
-///
 /// # Errors
 /// - If not in a git repository
 /// - If unable to access directories
-pub fn find_git_root() -> Result<PathBuf, Error> {
-    let mut current_path = env::current_dir()?;
+///
+/// # Returns
+/// - `Ok(PathBuf)` - Path to the git repository root
+/// - `Err` - If not in a git repository or other errors occur
+pub fn find_git_root() -> io::Result<PathBuf> {
+    let mut git_top_level_path = git_get_top_level_path()?;
 
     loop {
-        let git_path = current_path.join(".git");
+        let git_path = git_top_level_path.join(".git");
 
         if git_path.is_dir() {
             return Ok(git_path);
@@ -138,20 +137,22 @@ pub fn find_git_root() -> Result<PathBuf, Error> {
             let gitdir_path = content
                 .trim()
                 .strip_prefix("gitdir: ")
-                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Invalid gitdir format"))?;
+                .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "Invalid gitdir format"))?;
 
             let absolute_gitdir = if Path::new(gitdir_path).is_absolute() {
                 PathBuf::from(gitdir_path)
             } else {
-                current_path.join(gitdir_path)
+                git_top_level_path.join(gitdir_path)
             };
 
+            let final_path = absolute_gitdir.canonicalize()?;
+
             // Get parent of .git directory
-            return Ok(absolute_gitdir.canonicalize()?.to_path_buf());
+            return Ok(final_path);
         }
 
         // Move up one directory
-        if !current_path.pop() {
+        if !git_top_level_path.pop() {
             return Err(Error::new(
                 ErrorKind::NotFound,
                 "Not inside a git repository",
@@ -193,7 +194,7 @@ pub fn format_branch_name(commit_types: &[&str; 4], branch: &str) -> String {
 ///
 /// ## Returns
 /// * `String` - The current git branch
-pub fn get_current_branch() -> Result<String, Error> {
+pub fn get_current_branch() -> Result<String> {
     // Get the current branch
     let output = Command::new("git")
         .arg("branch")
@@ -219,7 +220,7 @@ pub fn get_current_branch() -> Result<String, Error> {
 ///
 /// ## Returns
 /// * `u16` - The number of commits
-pub fn get_current_commit_nb() -> Result<u16, Error> {
+pub fn get_current_commit_nb() -> Result<u16> {
     let branch = get_current_branch()?;
 
     let output = Command::new("git")
@@ -298,10 +299,7 @@ pub fn get_current_commit_nb() -> Result<u16, Error> {
 ///
 /// ## Returns
 /// * `Result<(), Error>` - Result of the operation
-pub fn git_add_with_exclude_patterns(
-    exclude_patterns: &[Pattern],
-    verbose: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool) -> Result<()> {
     if verbose {
         println!("Adding files...");
     }
@@ -320,21 +318,29 @@ pub fn git_add_with_exclude_patterns(
         })
         .collect();
 
-    let _ = Command::new("git")
-        .arg("add")
-        .args(&files_to_add)
-        .args(&deleted_files)
-        .output()?;
+    let top_level_dir = git_get_top_level_path()?;
 
-    let staged = Command::new("git")
-        .args(["diff", "--cached", "--numstat"])
-        .output()?;
+    if files_to_add.is_empty() {
+        println!("No files to add");
+    } else {
+        std::env::set_current_dir(&top_level_dir)?;
 
-    let staged_count = String::from_utf8_lossy(&staged.stdout).lines().count();
+        let _ = Command::new("git")
+            .arg("add")
+            .args(&files_to_add)
+            .args(&deleted_files)
+            .output()?;
 
-    let excluded_count = staged_files_len - files_to_add.len();
+        let staged = Command::new("git")
+            .args(["diff", "--cached", "--numstat"])
+            .output()?;
 
-    println!("Added {staged_count} files and excluded {excluded_count} files for commit.",);
+        let staged_count = String::from_utf8_lossy(&staged.stdout).lines().count();
+
+        let excluded_count = staged_files_len - files_to_add.len();
+
+        println!("Added {staged_count} files and excluded {excluded_count} files for commit.");
+    }
 
     Ok(())
 }
@@ -349,7 +355,7 @@ pub fn git_add_with_exclude_patterns(
 ///
 /// ## Returns
 /// * `Vec<String>` - List of files from git status
-pub fn get_status_files() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+pub fn get_status_files() -> Result<Vec<String>> {
     let status = read_git_status()?;
 
     // Regex to match any file in git status except deleted files
@@ -361,7 +367,8 @@ pub fn get_status_files() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // But not:
     //  D file.txt
     // AD file.txt
-    let regex_rule = Regex::new(r"^[MARCU? ][MARCU? ]\s(.*)$")?;
+    let regex_rule = Regex::new(r"^[MARCU? ][MARCU? ]\s(.*)$")
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
 
     // Use a HashSet to avoid duplicates
     let files: HashSet<String> = status
@@ -396,7 +403,7 @@ pub fn get_status_files() -> Result<Vec<String>, Box<dyn std::error::Error>> {
 ///
 /// ## Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
     if verbose {
         println!("Committing files...");
     }
@@ -404,7 +411,7 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
     if !commit_file_path.exists() {
-        return Err(Box::new(Error::other("Commit message file not found")));
+        return Err(Error::other("Commit message file not found"));
     }
 
     let file_content = read_to_string(commit_file_path)?;
@@ -437,8 +444,27 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::
             }
         }
 
-        Err(Box::new(Error::other("Git commit failed")))
+        Err(Error::other("Git commit failed"))
     }
+}
+
+/// # `git_get_top_level_path`
+/// Retrieves the top-level path of the git repository.
+///
+/// ## Errors
+/// * The git command fails.
+///
+/// ## Returns
+/// * `Result<PathBuf, Box<dyn std::error::Error>>`
+pub fn git_get_top_level_path() -> Result<PathBuf> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let git_top_level_path = PathBuf::from(stdout.trim());
+
+    Ok(git_top_level_path)
 }
 
 /// # `git_push`
@@ -451,7 +477,7 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::
 ///
 /// ## Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<()> {
     if verbose {
         println!("\nPushing...");
     }
@@ -480,7 +506,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
             }
         }
 
-        Err(Box::new(Error::other("Git commit failed")))
+        Err(Error::other("Git commit failed"))
     }
 }
 
@@ -498,7 +524,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<(), Box<dyn std::er
 /// ## Arguments
 /// * `commit_types` - `&str` - The commit types
 /// * `verbose` - `bool` - Verbose the operation
-pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<(), Error> {
+pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
     let commit_message_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
     let commitignore_path = Path::new(COMMITIGNORE_FILE_PATH);
 
@@ -596,7 +622,7 @@ pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<(), E
 ///
 /// ## Returns
 /// * `Result<Vec<String>, String>` - The deleted files or an error message
-pub fn process_deleted_files(message: &str) -> Result<Vec<String>, Error> {
+pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
     // Regex to match deleted files in git status output
     extract_filenames(
         message,
@@ -616,7 +642,7 @@ pub fn process_deleted_files(message: &str) -> Result<Vec<String>, Error> {
 ///
 /// ## Returns
 /// * `Result<Vec<String>, String>` - The modified/added files or an error message
-pub fn process_git_status(message: &str) -> Result<Vec<String>, Error> {
+pub fn process_git_status(message: &str) -> Result<Vec<String>> {
     // Regex to match the modified files and the added files
     extract_filenames(message, r"^[MTARCU][A-Z\?\! ]\s(.*)$")
 }
@@ -631,7 +657,7 @@ pub fn process_git_status(message: &str) -> Result<Vec<String>, Error> {
 ///
 /// ## Returns
 /// * `Result<Vec<String>, Error>` - The files and folders to ignore or an error message
-pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
+pub fn process_gitignore_file() -> Result<Vec<String>> {
     // look for the gitignore file
     let gitignore_file_path = Path::new(GITIGNORE_FILE_PATH);
     //
@@ -652,7 +678,7 @@ pub fn process_gitignore_file() -> Result<Vec<String>, Error> {
 ///
 /// ## Returns
 /// * `Result<String, String>` - The git status or an error message
-pub fn read_git_status() -> Result<String, Error> {
+pub fn read_git_status() -> Result<String> {
     let args = vec!["status", "--porcelain", "-u"];
     let command = Command::new("git").args(&args).output()?;
 
@@ -681,7 +707,7 @@ pub fn read_git_status() -> Result<String, Error> {
 ///
 /// ## Returns
 /// * `Result<Vec<String>, String>` - The extracted filenames or an error message
-fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>, Error> {
+fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
     let regex = Regex::new(pattern);
 
     if regex.is_err() {
