@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
-    fs::{self, File, OpenOptions, read_to_string, write},
-    io::{self, Error, ErrorKind, Result, Write},
+    fs::{File, OpenOptions, read_to_string, write},
+    io::{self, Error, Result, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -122,42 +122,26 @@ pub fn create_needed_files() -> Result<()> {
 /// - `Ok(PathBuf)` - Path to the git repository root
 /// - `Err` - If not in a git repository or other errors occur
 pub fn find_git_root() -> io::Result<PathBuf> {
-    let mut git_top_level_path = git_get_top_level_path()?;
+    let output = Command::new("git")
+        .args(["rev-parse", "--git-dir"])
+        .output()?;
 
-    loop {
-        let git_path = git_top_level_path.join(".git");
+    if output.status.success() {
+        let git_root = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
 
-        if git_path.is_dir() {
-            return Ok(git_path);
+        if git_root.exists() {
+            Ok(git_root)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Git root not found",
+            ))
         }
-
-        if git_path.is_file() {
-            // Submodule case
-            let content = fs::read_to_string(&git_path)?;
-            let gitdir_path = content
-                .trim()
-                .strip_prefix("gitdir: ")
-                .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "Invalid gitdir format"))?;
-
-            let absolute_gitdir = if Path::new(gitdir_path).is_absolute() {
-                PathBuf::from(gitdir_path)
-            } else {
-                git_top_level_path.join(gitdir_path)
-            };
-
-            let final_path = absolute_gitdir.canonicalize()?;
-
-            // Get parent of .git directory
-            return Ok(final_path);
-        }
-
-        // Move up one directory
-        if !git_top_level_path.pop() {
-            return Err(Error::new(
-                ErrorKind::NotFound,
-                "Not inside a git repository",
-            ));
-        }
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Git root not found",
+        ))
     }
 }
 
