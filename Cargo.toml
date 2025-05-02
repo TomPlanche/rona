@@ -7,7 +7,14 @@ keywords = ["cli", "git", "helper", "commands"]
 license = "Apache-2.0 OR MIT"
 name = "rona"
 repository = "https://github.com/tomplanche/rona"
-version = "2.0.4"
+version = "2.0.5"
+include = [
+    "/Cargo.toml",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+    "/README.md",
+    "/src/**",
+]
 
 [[bin]]
 name = "rona"
@@ -22,3 +29,6 @@ regex = "1.11.1"
 
 [dev-dependencies]
 tempfile = "3.19.1"
+
+[build-dependencies]
+hooksmith = "1.6.1"
