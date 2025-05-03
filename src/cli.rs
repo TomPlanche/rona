@@ -28,13 +28,13 @@ enum Commands {
     /// Directly commit the file with the text in `commit_message.md`.
     #[command(short_flag = 'c')]
     Commit {
-        /// Additionnal arguments to pass to the commit command
-        #[arg(value_name = "ARGS")]
-        args: Vec<String>,
-
         /// Whether to push the commit after committing
         #[arg(short = 'p', long = "push", default_value_t = false)]
         push: bool,
+
+        /// Additionnal arguments to pass to the commit command
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// Directly generate the `commit_message.md` file.
@@ -45,7 +45,7 @@ enum Commands {
     #[command(short_flag = 'i', name = "init")]
     Initialize {
         /// Editor to use for the commit message.
-        #[arg(short = 'e', long = "editor", default_value_t = String::from("nano"))]
+        #[arg(default_value_t = String::from("nano"))]
         editor: String,
     },
 
@@ -57,7 +57,7 @@ enum Commands {
     #[command(short_flag = 'p')]
     Push {
         /// Additionnal arguments to pass to the push command
-        #[arg(value_name = "ARGS")]
+        #[arg(allow_hyphen_values = true)]
         args: Vec<String>,
     },
 
@@ -168,8 +168,23 @@ mod cli_tests {
     use super::*;
     use clap::Parser;
 
+    // === ADD COMMAND TESTS ===
+
     #[test]
-    fn test_add_with_exclude_command() {
+    fn test_add_basic() {
+        let args = vec!["rona", "-a"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::AddWithExclude { exclude } => {
+                assert!(exclude.is_empty());
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_add_single_pattern() {
         let args = vec!["rona", "-a", "*.txt"];
         let cli = Cli::try_parse_from(args).unwrap();
 
@@ -182,7 +197,35 @@ mod cli_tests {
     }
 
     #[test]
-    fn test_commit_command() {
+    fn test_add_multiple_patterns() {
+        let args = vec!["rona", "-a", "*.txt", "*.log", "target/*"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::AddWithExclude { exclude } => {
+                assert_eq!(exclude, vec!["*.txt", "*.log", "target/*"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_add_with_long_name() {
+        let args = vec!["rona", "add-with-exclude", "*.txt"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::AddWithExclude { exclude } => {
+                assert_eq!(exclude, vec!["*.txt"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    // === COMMIT COMMAND TESTS ===
+
+    #[test]
+    fn test_commit_basic() {
         let args = vec!["rona", "-c"];
         let cli = Cli::try_parse_from(args).unwrap();
 
@@ -196,7 +239,7 @@ mod cli_tests {
     }
 
     #[test]
-    fn test_commit_command_with_push_no_args() {
+    fn test_commit_with_push_flag() {
         let args = vec!["rona", "-c", "--push"];
         let cli = Cli::try_parse_from(args).unwrap();
 
@@ -210,32 +253,143 @@ mod cli_tests {
     }
 
     #[test]
-    fn test_commit_command_with_args() {
-        let args = vec!["rona", "-c", "message"];
+    fn test_commit_with_message() {
+        let args = vec!["rona", "-c", "Regular commit message"];
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
             Commands::Commit { args, push } => {
                 assert!(!push);
-                assert_eq!(args, vec!["message"]);
+                assert_eq!(args, vec!["Regular commit message"]);
             }
             _ => panic!("Wrong command parsed"),
         }
     }
 
     #[test]
-    fn test_commit_command_with_push_and_args() {
-        let args = vec!["rona", "-c", "--push", "message"];
+    fn test_commit_with_git_flag() {
+        let args = vec!["rona", "-c", "--amend"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Commit { args, push } => {
+                assert!(!push);
+                assert_eq!(args, vec!["--amend"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_commit_with_multiple_git_flags() {
+        let args = vec!["rona", "-c", "--amend", "--no-edit"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Commit { args, push } => {
+                assert!(!push);
+                assert_eq!(args, vec!["--amend", "--no-edit"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_commit_with_push_and_git_flags() {
+        let args = vec!["rona", "-c", "--push", "--amend", "--no-edit"];
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
             Commands::Commit { args, push } => {
                 assert!(push);
-                assert_eq!(args, vec!["message"]);
+                assert_eq!(args, vec!["--amend", "--no-edit"]);
             }
             _ => panic!("Wrong command parsed"),
         }
     }
+
+    #[test]
+    fn test_commit_with_message_and_push() {
+        let args = vec!["rona", "-c", "--push", "Commit message"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Commit { args, push } => {
+                assert!(push);
+                assert_eq!(args, vec!["Commit message"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    // === PUSH COMMAND TESTS ===
+
+    #[test]
+    fn test_push_basic() {
+        let args = vec!["rona", "-p"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Push { args } => {
+                assert!(args.is_empty());
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_push_with_force() {
+        let args = vec!["rona", "-p", "--force"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Push { args } => {
+                assert_eq!(args, vec!["--force"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_push_with_multiple_args() {
+        let args = vec!["rona", "-p", "--force", "--set-upstream", "origin", "main"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Push { args } => {
+                assert_eq!(args, vec!["--force", "--set-upstream", "origin", "main"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_push_with_remote_and_branch() {
+        let args = vec!["rona", "-p", "origin", "feature/branch"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Push { args } => {
+                assert_eq!(args, vec!["origin", "feature/branch"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_push_with_upstream_tracking() {
+        let args = vec!["rona", "-p", "-u", "origin", "main"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Push { args } => {
+                assert_eq!(args, vec!["-u", "origin", "main"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    // === GENERATE COMMAND TESTS ===
 
     #[test]
     fn test_generate_command() {
@@ -248,6 +402,8 @@ mod cli_tests {
         }
     }
 
+    // === LIST STATUS COMMAND TESTS ===
+
     #[test]
     fn test_list_status_command() {
         let args = vec!["rona", "-l"];
@@ -259,14 +415,123 @@ mod cli_tests {
         }
     }
 
+    // === INITIALIZE COMMAND TESTS ===
+
     #[test]
-    fn test_push_command() {
-        let args = vec!["rona", "-p", "--", "--force"];
+    fn test_init_default_editor() {
+        let args = vec!["rona", "-i"];
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            Commands::Push { args } => {
-                assert_eq!(args, vec!["--force"]);
+            Commands::Initialize { editor } => {
+                assert_eq!(editor, "nano");
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_init_custom_editor() {
+        let args = vec!["rona", "-i", "zed"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Initialize { editor } => {
+                assert_eq!(editor, "zed");
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    // === SET EDITOR COMMAND TESTS ===
+
+    #[test]
+    fn test_set_editor() {
+        let args = vec!["rona", "-s", "vim"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Set { editor } => {
+                assert_eq!(editor, "vim");
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_set_editor_with_spaces() {
+        let args = vec!["rona", "-s", "\"Visual Studio Code\""];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Set { editor } => {
+                assert_eq!(editor, "\"Visual Studio Code\"");
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_set_editor_with_path() {
+        let args = vec!["rona", "-s", "/usr/bin/vim"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Set { editor } => {
+                assert_eq!(editor, "/usr/bin/vim");
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    // === VERBOSE FLAG TESTS ===
+
+    #[test]
+    fn test_verbose_with_commit() {
+        let args = vec!["rona", "-v", "-c"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert!(cli.verbose);
+    }
+
+    #[test]
+    fn test_verbose_with_push() {
+        let args = vec!["rona", "-v", "-p"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert!(cli.verbose);
+    }
+
+    #[test]
+    fn test_verbose_long_form() {
+        let args = vec!["rona", "--verbose", "-c"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert!(cli.verbose);
+    }
+
+    // === EDGE CASES AND ERROR TESTS ===
+
+    #[test]
+    fn test_commit_flag_order_sensitivity() {
+        let args = vec!["rona", "-c", "--amend", "--push"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Commit { args, push } => {
+                assert!(!push); // --push should be treated as git arg
+                assert_eq!(args, vec!["--amend", "--push"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_commit_with_similar_looking_args() {
+        let args = vec!["rona", "-c", "--push-to-upstream"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Commit { args, push } => {
+                assert!(!push);
+                assert_eq!(args, vec!["--push-to-upstream"]);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -279,22 +544,23 @@ mod cli_tests {
     }
 
     #[test]
-    fn test_cli_parsing() {
-        let args = vec!["rona", "-a", "*.rs"];
-        let cli = Cli::try_parse_from(args).unwrap();
-
-        match cli.command {
-            Commands::AddWithExclude { exclude } => {
-                assert_eq!(exclude, vec!["*.rs"]);
-            }
-            _ => panic!("Wrong command parsed"),
-        }
+    fn test_missing_required_value() {
+        let args = vec!["rona", "-s"]; // missing editor value
+        assert!(Cli::try_parse_from(args).is_err());
     }
 
     #[test]
-    fn test_verbose_flag() {
-        let args = vec!["rona", "-v", "-a", "*.rs"];
+    fn test_complex_command_combination() {
+        let args = vec!["rona", "-v", "-c", "--push", "--amend", "--no-edit"];
         let cli = Cli::try_parse_from(args).unwrap();
+
         assert!(cli.verbose);
+        match cli.command {
+            Commands::Commit { args, push } => {
+                assert!(push);
+                assert_eq!(args, vec!["--amend", "--no-edit"]);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
     }
 }
