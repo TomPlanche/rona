@@ -9,7 +9,10 @@ use std::{
 use glob::Pattern;
 use regex::Regex;
 
-use crate::{print_error, utils::check_for_file_in_folder};
+use crate::{
+    print_error,
+    utils::{check_for_file_in_folder, find_project_root},
+};
 
 pub const COMMIT_MESSAGE_FILE_PATH: &str = "commit_message.md";
 pub const COMMIT_TYPES: [&str; 4] = ["chore", "feat", "fix", "test"];
@@ -95,6 +98,9 @@ pub fn add_to_git_exclude(paths: &[&str]) -> Result<()> {
 /// * If the files cannot be created.
 /// * If the git add command fails.
 pub fn create_needed_files() -> Result<()> {
+    let project_root = find_project_root()?;
+    std::env::set_current_dir(project_root)?;
+
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
     let commitignore_file_path = Path::new(COMMITIGNORE_FILE_PATH);
 
@@ -385,6 +391,9 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
     if verbose {
         println!("Committing files...");
     }
+
+    let project_root = find_project_root()?;
+    std::env::set_current_dir(project_root)?;
 
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
