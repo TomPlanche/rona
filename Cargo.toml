@@ -32,4 +32,4 @@ regex = "1.11.1"
 tempfile = "3.19.1"
 
 [build-dependencies]
-hooksmith = "1.7.0"
+hooksmith = "1.7.2"

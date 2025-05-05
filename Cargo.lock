@@ -205,9 +205,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hooksmith"
-version = "1.7.0"
+version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "627c6364e35e88c6dd280d92deccf8d08e40d698e818384c0e5ebb225e085bd1"
+checksum = "3928b5fff869f54262617e3f6ddf8b87dea91c8d5968e427fca425693434bca0"
 dependencies = [
  "clap",
  "serde",
