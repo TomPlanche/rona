@@ -305,7 +305,7 @@ pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool
     let top_level_dir = git_get_top_level_path()?;
 
     if files_to_add.is_empty() {
-        println!("No files to add");
+        println!("No files to add, deleted {} files", deleted_files.len());
     } else {
         std::env::set_current_dir(&top_level_dir)?;
 
