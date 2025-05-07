@@ -364,7 +364,7 @@ pub fn get_status_files() -> Result<Vec<String>> {
 
             if regex_rule.is_match(line) {
                 let captures = regex_rule.captures(line)?;
-                
+
                 // If we have a second capture group, it means we have a renamed file
                 // In this case, we want to use the new filename (after the ->)
                 if let Some(new_name) = captures.get(2) {
