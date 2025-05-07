@@ -348,10 +348,9 @@ pub fn get_status_files() -> Result<Vec<String>> {
     // M  file.txt
     //  M file.txt
     // ?? file.txt
-    // But not:
-    //  D file.txt
-    // AD file.txt
-    let regex_rule = Regex::new(r"^[MARCU\?\s][MARCU\?\s]\s(.*)$")
+    // R  old_file.txt -> new_file.txt
+    //  R old_file.txt -> new_file.txt
+    let regex_rule = Regex::new(r"^[MARCU?\s][MARCU?\s]\s(.+?)(?:\s->\s(.+))?$")
         .map_err(|e| Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
 
     // Use a HashSet to avoid duplicates
@@ -364,7 +363,15 @@ pub fn get_status_files() -> Result<Vec<String>> {
             }
 
             if regex_rule.is_match(line) {
-                Some(regex_rule.captures(line)?.get(1)?.as_str().to_string())
+                let captures = regex_rule.captures(line)?;
+                
+                // If we have a second capture group, it means we have a renamed file
+                // In this case, we want to use the new filename (after the ->)
+                if let Some(new_name) = captures.get(2) {
+                    Some(new_name.as_str().to_string())
+                } else {
+                    Some(captures.get(1)?.as_str().to_string())
+                }
             } else {
                 println!("Error: unexpected line in git status: {line}");
                 None
@@ -632,8 +639,9 @@ pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
 /// ## Returns
 /// * `Result<Vec<String>, String>` - The modified/added files or an error message
 pub fn process_git_status(message: &str) -> Result<Vec<String>> {
-    // Regex to match the modified files and the added files
-    extract_filenames(message, r"^[MTARCU][A-Z\?\! ]\s(.*)$")
+    // Regex to match the modified files, added files, and renamed files
+    // For renamed files, captures the new filename after '->'
+    extract_filenames(message, r"^[MTARCU][A-Z\?\! ]\s(.+?)(?:\s->\s(.+))?$")
 }
 
 /// # `process_gitignore_file`
@@ -712,7 +720,11 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
     for line in message.lines() {
         if regex.is_match(line) {
             if let Some(captures) = regex.captures(line) {
-                if let Some(file_name) = captures.get(1) {
+                // If we have a second capture group (renamed file), use that
+                // Otherwise use the first capture group
+                if let Some(new_name) = captures.get(2) {
+                    result.push(new_name.as_str().to_string());
+                } else if let Some(file_name) = captures.get(1) {
                     result.push(file_name.as_str().to_string());
                 }
             }
@@ -739,7 +751,8 @@ mod tests {
             "UU src/bla.rs",
             "!! src/bli.rs",
             "DD src/blo.rs",
-            "R  src/blu.rs",
+            "R  src/old_file.rs -> src/new_file.rs",
+            " R src/old_path/file.rs -> src/new_path/file.rs", // not staged so not included
             "C  src/bly.rs",
             "U  src/pae.rs",
         ];
@@ -752,7 +765,7 @@ mod tests {
                 "src/main.rs",
                 "src/utils.rs",
                 "src/bla.rs",
-                "src/blu.rs",
+                "src/new_file.rs",
                 "src/bly.rs",
                 "src/pae.rs",
             ]
