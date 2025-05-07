@@ -351,7 +351,7 @@ pub fn get_status_files() -> Result<Vec<String>> {
     // But not:
     //  D file.txt
     // AD file.txt
-    let regex_rule = Regex::new(r"^[MARCU? ][MARCU? ]\s(.*)$")
+    let regex_rule = Regex::new(r"^[MARCU\?\s][MARCU\?\s]\s(.*)$")
         .map_err(|e| Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
 
     // Use a HashSet to avoid duplicates
@@ -359,7 +359,7 @@ pub fn get_status_files() -> Result<Vec<String>> {
         .lines()
         .filter_map(|line| {
             // Skip if it's a deleted file
-            if line.contains(" D") || line.contains("D ") {
+            if line.starts_with(" D") || line.starts_with("D ") {
                 return None;
             }
 
@@ -372,7 +372,9 @@ pub fn get_status_files() -> Result<Vec<String>> {
         })
         .collect();
 
-    Ok(files.into_iter().collect())
+    let files = files.into_iter().collect();
+
+    Ok(files)
 }
 
 /// # `git_commit`
