@@ -280,16 +280,15 @@ pub fn get_current_commit_nb() -> Result<u16> {
 /// ## Arguments
 /// * `exclude_patterns` - List of patterns to exclude
 /// * `verbose` - Whether to print verbose output
-///
-/// ## Returns
-/// * `Result<(), Error>` - Result of the operation
 pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool) -> Result<()> {
     if verbose {
         println!("Adding files...");
     }
 
     let git_status = read_git_status()?;
+
     let deleted_files = process_deleted_files(&git_status)?;
+    let deleted_files_count = deleted_files.len();
 
     let staged_files = get_status_files()?;
     let staged_files_len = staged_files.len();
@@ -302,17 +301,16 @@ pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool
         })
         .collect();
 
-    let top_level_dir = git_get_top_level_path()?;
-
-    if files_to_add.is_empty() {
-        println!("No files to add, deleted {} files", deleted_files.len());
+    if files_to_add.is_empty() && deleted_files.is_empty() {
+        println!("No files to add or delete");
     } else {
+        let top_level_dir = git_get_top_level_path()?;
         std::env::set_current_dir(&top_level_dir)?;
 
         let _ = Command::new("git")
             .arg("add")
             .args(&files_to_add)
-            .args(&deleted_files)
+            .args(deleted_files)
             .output()?;
 
         let staged = Command::new("git")
@@ -323,7 +321,9 @@ pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool
 
         let excluded_count = staged_files_len - files_to_add.len();
 
-        println!("Added {staged_count} files and excluded {excluded_count} files for commit.");
+        println!(
+            "Added {staged_count} files, deleted {deleted_files_count} and excluded {excluded_count} files for commit."
+        );
     }
 
     Ok(())
