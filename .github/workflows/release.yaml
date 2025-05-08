@@ -50,6 +50,11 @@ jobs:
           cargo install rona
           ```
 
+          ### Via Homebrew
+          ```bash
+          brew install tom-planche/tap/rona
+          ```
+
           ### Via Binary Download
           Download the appropriate binary for your system from the assets below and extract it to a directory in your PATH.
 
@@ -57,6 +62,9 @@ jobs:
           - Linux (x86_64)
           - macOS (Intel x86_64)
           - macOS (Apple Silicon arm64)
+
+          ## SHA256 Checksums
+          _Will be added during release process_
 
           ## Changes
           EOF
@@ -99,10 +107,23 @@ jobs:
           tar -czvf rona-${VERSION}-macos-x86_64.tar.gz rona
           cd ..
 
+      - name: Calculate SHA256
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cd release
+          SHA256=$(shasum -a 256 rona-${VERSION}-macos-x86_64.tar.gz | cut -d ' ' -f 1)
+          echo "SHA256_INTEL=${SHA256}" >> $GITHUB_ENV
+          echo "### SHA256 (Intel)"  > sha256.md
+          echo '```' >> sha256.md
+          echo "${SHA256}  rona-${VERSION}-macos-x86_64.tar.gz" >> sha256.md
+          echo '```' >> sha256.md
+
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/rona-*-macos-x86_64.tar.gz
+          body_path: release/sha256.md
+          append_body: true
 
   build-macos-arm:
     name: Build macOS Apple Silicon Binary
@@ -134,7 +155,20 @@ jobs:
           tar -czvf rona-${VERSION}-macos-arm64.tar.gz rona
           cd ..
 
+      - name: Calculate SHA256
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cd release
+          SHA256=$(shasum -a 256 rona-${VERSION}-macos-arm64.tar.gz | cut -d ' ' -f 1)
+          echo "SHA256_ARM=${SHA256}" >> $GITHUB_ENV
+          echo "### SHA256 (Apple Silicon)" > sha256.md
+          echo '```' >> sha256.md
+          echo "${SHA256}  rona-${VERSION}-macos-arm64.tar.gz" >> sha256.md
+          echo '```' >> sha256.md
+
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/rona-*-macos-arm64.tar.gz
+          body_path: release/sha256.md
+          append_body: true
