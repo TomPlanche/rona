@@ -1,9 +1,28 @@
-use std::process::Command;
-
-use clap::{Parser, Subcommand, command};
-
-use dialoguer::Select;
-use glob::Pattern;
+//! Command Line Interface (CLI) Module for Rona
+//!
+//! This module handles all command-line interface functionality for Rona, including
+//! - Command parsing and execution
+//! - Subcommand implementations
+//! - CLI argument handling
+//!
+//! # Commands
+//!
+//! The CLI supports several commands:
+//! - `add-with-exclude`: Add files to git while excluding specified patterns
+//! - `commit`: Commit changes using the commit message from `commit_message.md`
+//! - `generate`: Generate a new commit message file
+//! - `init`: Initialize Rona configuration
+//! - `list-status`: List git status files (for shell completion)
+//! - `push`: Push changes to remote repository
+//! - `set-editor`: Configure the editor for commit messages
+//!
+//! # Features
+//!
+//! - Supports verbose mode for detailed operation logging
+//! - Integrates with git commands
+//! - Provides shell completion capabilities
+//! - Handles configuration management
+//!
 
 use crate::{
     config::Config,
@@ -13,6 +32,10 @@ use crate::{
     },
     my_clap_theme,
 };
+use clap::{Parser, Subcommand, command};
+use dialoguer::Select;
+use glob::Pattern;
+use std::process::Command;
 
 /// CLI's commands
 #[derive(Subcommand)]
@@ -91,14 +114,13 @@ pub struct Cli {
     verbose: bool,
 }
 
-/// # `run`
 /// Runs the program.
 ///
-/// ## Panics
+/// # Panics
 /// * If the given glob patterns are invalid.
 ///
-/// ## Errors
-/// Returns an error if the command fails.
+/// # Errors
+/// * Return an error if the command fails.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 

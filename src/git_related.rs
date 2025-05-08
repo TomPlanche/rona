@@ -1,3 +1,31 @@
+//! Git Integration Module for Rona
+//!
+//! This module provides comprehensive Git integration functionality, including
+//! - Git repository management
+//! - Commit message generation and handling
+//! - Git ignore patterns management
+//! - Branch operations
+//!
+//! # Core Features
+//!
+//! - Repository detection and validation
+//! - Commit message file management
+//! - Git status processing
+//! - Branch name formatting
+//! - Git command execution wrappers
+//!
+//! # Constants
+//!
+//! - `COMMIT_MESSAGE_FILE_PATH`: Path to the commit message file
+//! - `COMMIT_TYPES`: Available commit types (chore, feat, fix, test)
+//! - `COMMITIGNORE_FILE_PATH`: Path to the commit ignore file
+//! - `GITIGNORE_FILE_PATH`: Path to the git ignore file
+//!
+//! # Error Handling
+//!
+//! All functions return `Result` types to properly handle Git-related errors
+//! and provide meaningful error messages to users.
+
 use std::{
     collections::HashSet,
     fs::{File, OpenOptions, read_to_string, write},
@@ -19,17 +47,17 @@ pub const COMMIT_TYPES: [&str; 4] = ["chore", "feat", "fix", "test"];
 const COMMITIGNORE_FILE_PATH: &str = ".commitignore";
 const GITIGNORE_FILE_PATH: &str = ".gitignore";
 
-/// # `add_to_git_exclude`
 /// Add paths to the `.git/info/exclude` file.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `project_root` - The path to the project root.
 /// * `paths` - List of paths to add to the exclude file.
 ///
-/// ## Errors
+/// # Errors
 /// * If the file cannot be read/opened/written to.
 ///
-/// ## Returns * `Result<(), std::io::Error>` - Result of the operation.
+/// # Returns
+/// * `Result<(), std::io::Error>` - Result of the operation.
 pub fn add_to_git_exclude(paths: &[&str]) -> Result<()> {
     let git_root_path = find_git_root()?;
 
@@ -91,10 +119,9 @@ pub fn add_to_git_exclude(paths: &[&str]) -> Result<()> {
     Ok(())
 }
 
-/// # `create_needed_files`
 /// Creates the necessary files in the project root.
 ///
-/// ## Errors
+/// # Errors
 /// * If the files cannot be created.
 /// * If the git add command fails.
 pub fn create_needed_files() -> Result<()> {
@@ -145,15 +172,14 @@ pub fn find_git_root() -> Result<PathBuf> {
     }
 }
 
-/// # `format_branch_name`
 /// Formats the branch name.
 /// If the branch name contains a `COMMIT_TYPES`, it will be removed.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `commit_types` - `&[&str; 4]` - The commit types
 /// * `branch` - `String` - The branch name
 ///
-/// ## Returns
+/// # Returns
 /// * `String` - The formatted branch name
 #[must_use]
 pub fn format_branch_name(commit_types: &[&str; 4], branch: &str) -> String {
@@ -169,14 +195,13 @@ pub fn format_branch_name(commit_types: &[&str; 4], branch: &str) -> String {
     formatted_branch
 }
 
-/// # `get_current_branch`
 /// Returns the current git branch.
 ///
-/// ## Errors
+/// # Errors
 /// * If the git command fails
 /// * If the output cannot be parsed as a string
 ///
-/// ## Returns
+/// # Returns
 /// * `String` - The current git branch
 pub fn get_current_branch() -> Result<String> {
     // Get the current branch
@@ -195,14 +220,13 @@ pub fn get_current_branch() -> Result<String> {
     }
 }
 
-/// # `get_current_commit_nb`
 /// Returns the number of commits.
 ///
-/// ## Errors
+/// # Errors
 /// * If the git command fails
 /// * If the output cannot be parsed as a number
 ///
-/// ## Returns
+/// # Returns
 /// * `u16` - The number of commits
 pub fn get_current_commit_nb() -> Result<u16> {
     let branch = get_current_branch()?;
@@ -219,15 +243,14 @@ pub fn get_current_commit_nb() -> Result<u16> {
     Ok(commit_count)
 }
 
-/// # `git_add_with_exclude_patterns`
 /// Adds files to the git index.
 ///
-/// ## Errors
+/// # Errors
 /// * If reading git status fails
 /// * If adding files to git fails
 /// * If getting git staged information fails
 ///
-/// ## Examples
+/// # Examples
 /// ```no_run
 /// use std::error::Error;
 /// use glob::Pattern;
@@ -277,7 +300,7 @@ pub fn get_current_commit_nb() -> Result<u16> {
 /// - `"[abc]*.rs"` excludes Rust files starting with a, b, or c
 /// - Error handling shows proper pattern creation with error propagation
 ///
-/// ## Arguments
+/// # Arguments
 /// * `exclude_patterns` - List of patterns to exclude
 /// * `verbose` - Whether to print verbose output
 pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool) -> Result<()> {
@@ -329,15 +352,14 @@ pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool
     Ok(())
 }
 
-/// # `get_status_files`
 /// Returns a list of all files that appear in git status
 /// (modified, untracked, staged - but not deleted)
 ///
-/// ## Errors
+/// # Errors
 /// * If reading git status fails
 /// * If a regex pattern fails to compile
 ///
-/// ## Returns
+/// # Returns
 /// * `Vec<String>` - List of files from git status
 pub fn get_status_files() -> Result<Vec<String>> {
     let status = read_git_status()?;
@@ -384,17 +406,16 @@ pub fn get_status_files() -> Result<Vec<String>> {
     Ok(files)
 }
 
-/// # `git_commit`
 /// Commits files to the git repository.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `args` - The arguments to pass to the git commit command.
 ///
-/// ## Errors
+/// # Errors
 /// * If writing commit message fails
 /// * If git commit fails
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
 pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
     if verbose {
@@ -444,13 +465,12 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
     }
 }
 
-/// # `git_get_top_level_path`
 /// Retrieves the top-level path of the git repository.
 ///
-/// ## Errors
+/// # Errors
 /// * The git command fails.
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<PathBuf, Box<dyn std::error::Error>>`
 pub fn git_get_top_level_path() -> Result<PathBuf> {
     let output = Command::new("git")
@@ -463,15 +483,14 @@ pub fn git_get_top_level_path() -> Result<PathBuf> {
     Ok(git_top_level_path)
 }
 
-/// # `git_push`
 /// Pushes the changes.
 ///
 /// * `args` - The arguments to pass to the git push command.
 /// * `verbose` - Whether to print verbose output.
 ///
-/// ## Errors
+/// # Errors
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
 pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<()> {
     if verbose {
@@ -506,18 +525,17 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<()> {
     }
 }
 
-/// # `generate_commit_message`
 /// Prepares the commit message.
 /// It creates the commit message file and empties it if it already exists.
 /// It also adds the modified / added files to the commit message file.
 ///
-/// ## Errors
+/// # Errors
 /// * If we cannot write to the commit message file
 /// * If we cannot read the git status
 /// * If we cannot process either git status or deleted files from the git status
 /// * If we cannot read the commitignore file
 ///
-/// ## Arguments
+/// # Arguments
 /// * `commit_types` - `&str` - The commit types
 /// * `verbose` - `bool` - Verbose the operation
 pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
@@ -607,16 +625,15 @@ pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-/// # `process_deleted_files`
 /// Processes the deleted files from git status output.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `message` - The git status output string
 ///
-/// ## Errors
+/// # Errors
 /// * If the extracted filenames cannot be parsed
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<Vec<String>, String>` - The deleted files or an error message
 pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
     // Regex to match deleted files in git status output
@@ -626,17 +643,16 @@ pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
     )
 }
 
-/// # `process_git_status`
 /// Processes the git status.
 /// It will parse the git status to prepare the git commit message.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `message` - The git status output string
 ///
-/// ## Errors
+/// # Errors
 /// * If the extracted filenames cannot be parsed
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<Vec<String>, String>` - The modified/added files or an error message
 pub fn process_git_status(message: &str) -> Result<Vec<String>> {
     // Regex to match the modified files, added files, and renamed files
@@ -644,15 +660,14 @@ pub fn process_git_status(message: &str) -> Result<Vec<String>> {
     extract_filenames(message, r"^[MTARCU][A-Z\?\! ]\s(.+?)(?:\s->\s(.+))?$")
 }
 
-/// # `process_gitignore_file`
 /// Processes the gitignore file.
 ///
-/// ## Errors
+/// # Errors
 /// * If the gitignore file is not found
 /// * If the gitignore file cannot be read
 /// * If the gitignore file contains invalid patterns
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<Vec<String>, Error>` - The files and folders to ignore or an error message
 pub fn process_gitignore_file() -> Result<Vec<String>> {
     // look for the gitignore file
@@ -667,13 +682,12 @@ pub fn process_gitignore_file() -> Result<Vec<String>> {
     extract_filenames(&git_ignore_file_contents, r"^([^#]\S*)$")
 }
 
-/// # `read_git_status`
 /// Reads the git status.
 ///
-/// ## Errors
+/// # Errors
 /// * If the git command fails
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<String, String>` - The git status or an error message
 pub fn read_git_status() -> Result<String> {
     let args = vec!["status", "--porcelain", "-u"];
@@ -695,14 +709,13 @@ pub fn read_git_status() -> Result<String> {
     }
 }
 
-/// # `extract_filenames`
 /// Extracts filenames from a git status message using a regex pattern.
 ///
-/// ## Errors
+/// # Errors
 /// * If the regex pattern is invalid
 /// * If the filename cannot be captured from a line
 ///
-/// ## Returns
+/// # Returns
 /// * `Result<Vec<String>, String>` - The extracted filenames or an error message
 fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
     let regex = Regex::new(pattern);

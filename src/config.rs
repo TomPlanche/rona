@@ -1,3 +1,26 @@
+//! Configuration Management Module for Rona
+//!
+//! This module handles all configuration-related functionality, including
+//! - Reading and writing configuration files
+//! - Managing editor preferences
+//! - Handling configuration errors
+//!
+//! # Configuration Structure
+//!
+//! The configuration is stored in TOML format at `~/.config/rona/config.toml`
+//! and contains settings such as
+//! - Editor preferences
+//! - Other configuration options
+//!
+//! # Error Handling
+//!
+//! The module provides a custom error type `ConfigError` that handles various
+//! configuration-related errors including
+//! - IO errors
+//! - Missing configuration
+//! - Invalid configuration format
+//! - Home directory not found
+
 use regex::Regex;
 use std::{env, fs, path::PathBuf};
 
@@ -50,10 +73,9 @@ pub struct Config {
 }
 
 impl Config {
-    /// `new`
     /// Creates a new Config instance with the default root
     ///
-    /// ## Errors
+    /// # Errors
     /// * When getting the config root fails
     pub fn new() -> Result<Self, ConfigError> {
         let root = Config::get_config_root()?;
@@ -61,20 +83,18 @@ impl Config {
         Ok(Config { root })
     }
 
-    /// `with_root`
     /// Creates a new Config instance with a custom root path
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `root` - The custom root path
     pub fn with_root(root: impl Into<PathBuf>) -> Self {
         Config { root: root.into() }
     }
 
-    /// # `get_editor`
     /// Retrieves the editor from the configuration file.
     ///
-    /// ## Errors
-    /// * If the configuration file cannot be read or if it is inexistent.
+    /// # Errors
+    /// * If the configuration file cannot be read, or if it is inexistent.
     /// * If the regex pattern fails to compile.
     /// * If the regex pattern fails to match the editor.
     pub fn get_editor(&self) -> Result<String, ConfigError> {
@@ -104,14 +124,13 @@ impl Config {
         Ok(editor.trim().to_string())
     }
 
-    /// # `set_editor`
     /// Sets the editor in the configuration file.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `editor` - The editor to set.
     ///
-    /// ## Errors
-    /// Returns an error if the configuration file cannot be read or written.
+    /// # Errors
+    /// * if the configuration file cannot be read or written.
     pub fn set_editor(&self, editor: &str) -> Result<(), ConfigError> {
         let config_file = self.get_config_file_path()?;
 
@@ -139,13 +158,12 @@ impl Config {
         Ok(())
     }
 
-    /// # `create_config_file`
     /// Creates a new configuration file
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `editor` - The editor to use
     ///
-    /// ## Errors
+    /// # Errors
     /// * If an I/O error occurs while creating the configuration file
     /// * If the file already exists
     pub fn create_config_file(&self, editor: &str) -> Result<(), ConfigError> {
@@ -178,13 +196,12 @@ impl Config {
         Ok(())
     }
 
-    /// # `get_config_folder_path`
     /// Returns the path to the configuration folder.
     ///
-    /// ## Errors
+    /// # Errors
     /// * If the home directory cannot be determined
     ///
-    /// ## Returns
+    /// # Returns
     /// The path to the configuration folder.
     pub fn get_config_folder_path(&self) -> Result<PathBuf, ConfigError> {
         let config_folder_path = self.root.join(".config").join("rona");
@@ -192,13 +209,12 @@ impl Config {
         Ok(config_folder_path)
     }
 
-    /// # `get_config_file_path`
     /// Returns the path to the configuration file
     ///
-    /// ## Errors
+    /// # Errors
     /// * If the home directory cannot be determined
     ///
-    /// ## Returns
+    /// # Returns
     /// The path to the configuration file
     pub fn get_config_file_path(&self) -> Result<PathBuf, ConfigError> {
         let config_folder_path = self.get_config_folder_path()?;
@@ -206,13 +222,12 @@ impl Config {
         Ok(config_folder_path.join("config.toml"))
     }
 
-    /// # `get_config_root`
     /// Returns the root directory for the configuration files
     ///
-    /// ## Errors
+    /// # Errors
     /// * If the home directory cannot be determined
     ///
-    /// ## Returns
+    /// # Returns
     /// The root directory for the configuration files
     fn get_config_root() -> Result<PathBuf, ConfigError> {
         // Use environment variable for testing
@@ -229,13 +244,12 @@ impl Config {
         }
     }
 
-    /// # `get_regex_editor`
     /// Returns the regex to match the editor in the configuration file
     ///
-    /// ## Errors
+    /// # Errors
     /// * If the regex cannot be compiled
     ///
-    /// ## Returns
+    /// # Returns
     /// The regex to match the editor in the configuration file
     fn get_regex_editor() -> Result<Regex, ConfigError> {
         let regex = Regex::new(r#"editor\s*=\s*"(.*?)""#);

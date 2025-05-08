@@ -1,3 +1,30 @@
+//! Utility Functions Module for Rona
+//!
+//! This module provides common utility functions and traits used throughout the application, including
+//! - Message formatting and display
+//! - File and directory operations
+//! - Error handling utilities
+//!
+//! # Message Types
+//!
+//! The module implements four types of messages:
+//! - Error messages (🚨)
+//! - Warning messages (⚠️)
+//! - Success messages (✅)
+//! - Info messages (ℹ️)
+//!
+//! # Core Features
+//!
+//! - Consistent message formatting
+//! - File path validation and checking
+//! - Project root directory detection
+//! - List formatting utilities
+//!
+//! # Error Handling
+//!
+//! All file operations return `Result` types with detailed error messages
+//! for proper error handling throughout the application.
+
 use std::{
     env,
     fmt::Display,
@@ -5,7 +32,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// # `MessageType`
 /// Trait for message types.
 trait MessageType {
     /// The emoji prefix for each message type (e.g., "🚨 ERROR")
@@ -39,28 +65,26 @@ impl MessageType for Info {
     const PREFIX: &'static str = "ℹ️ INFO";
 }
 
-/// # `format_message`
 /// Formats a message without suggestion.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `title` - The title of the message.
 /// * `details` - The details of the message.
 ///
-/// ## Returns
+/// # Returns
 /// * String - The formatted message.
 fn format_message<T: MessageType>(title: &str, details: &str) -> String {
     format!("{}: {title}\n\n{details}", T::PREFIX)
 }
 
-/// # `format_message_with_suggestion`
 /// Formats a message with suggestion.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `title` - The title of the message.
 /// * `details` - The details of the message.
 /// * `suggestion` - The suggestion for the message.
 ///
-/// ## Returns
+/// # Returns
 /// * String - The formatted message.
 fn format_message_with_suggestion<T: MessageType>(
     title: &str,
@@ -70,14 +94,13 @@ fn format_message_with_suggestion<T: MessageType>(
     format!("{}\n\n{suggestion}", format_message::<T>(title, details))
 }
 
-/// # `print_message`
 /// Prints a message without suggestion.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `title` - The title of the message.
 /// * `details` - The details of the message.
 ///
-/// ## Returns
+/// # Returns
 /// * String - The formatted message.
 fn print_message<T: MessageType>(title: &str, details: &str) {
     let message = format_message::<T>(title, details);
@@ -89,15 +112,14 @@ fn print_message<T: MessageType>(title: &str, details: &str) {
     }
 }
 
-/// # `print_message_with_suggestion`
 /// Prints a message with suggestion.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `title` - The title of the message.
 /// * `details` - The details of the message.
 /// * `suggestion` - The suggestion for resolving the message.
 ///
-/// ## Returns
+/// # Returns
 /// * String - The formatted message.
 fn print_message_with_suggestion<T: MessageType>(title: &str, details: &str, suggestion: &str) {
     let message = format_message_with_suggestion::<T>(title, details, suggestion);
@@ -108,10 +130,9 @@ fn print_message_with_suggestion<T: MessageType>(title: &str, details: &str, sug
     }
 }
 
-/// # `print_error`
 /// Prints an error message with a consistent format for user-friendly display.
 ///
-/// ## Arguments
+/// # Arguments
 /// - `title`: The title of the error message.
 /// - `details`: The details of the error message.
 /// - `suggestion`: The suggestion for resolving the error.
@@ -119,43 +140,39 @@ pub fn print_error(title: &str, details: &str, suggestion: &str) {
     print_message_with_suggestion::<Error>(title, details, suggestion);
 }
 
-/// # `print_warning`
 /// Prints a warning message with a consistent format for user-friendly display.
 ///
-/// ## Arguments
+/// # Arguments
 /// - `title`: The title of the warning message.
 /// - `details`: The details of the warning message.
 pub fn print_warning(title: &str, details: &str) {
     print_message::<Warning>(title, details);
 }
 
-/// # `print_success`
 /// Prints a success message with a consistent format for user-friendly display.
 ///
-/// ## Arguments
+/// # Arguments
 /// - `title`: The title of the success message.
 /// - `details`: The details of the success message.
 pub fn print_success(title: &str, details: &str) {
     print_message::<Success>(title, details);
 }
 
-/// # `print_info`
 /// Prints an informational message with a consistent format for user-friendly display.
 ///
-/// ## Arguments
+/// # Arguments
 /// - `title`: The title of the informational message.
 /// - `details`: The details of the informational message.
 pub fn print_info(title: &str, details: &str) {
     print_message::<Info>(title, details);
 }
 
-/// # `format_list`
 /// Formats a list of items with a consistent format for user-friendly display.
 ///
-/// ## Arguments
+/// # Arguments
 /// - `items`: The list of items to format.
 ///
-/// ## Returns
+/// # Returns
 /// * String - A formatted string representation of the list.
 pub fn format_list<T: Display>(items: &[T]) -> String {
     items
@@ -165,20 +182,19 @@ pub fn format_list<T: Display>(items: &[T]) -> String {
         .join("\n")
 }
 
-/// # `check_for_file_in_folder`
 /// Checks if a file path starts with or is contained within a folder path.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `file_path` - Path of the file to check
 /// * `folder_path` - Path of the containing folder
 ///
-/// ## Errors
+/// # Errors
 /// Returns an error if:
 /// * The file path is invalid (empty or has an invalid parent)
 /// * The folder path is invalid or empty
 /// * Either path cannot be converted to a canonical form
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok(bool)` - True if the file is within the folder, false otherwise
 /// * `Err(std::io::Error)` - If there's an error processing the paths
 pub fn check_for_file_in_folder(file_path: &Path, folder_path: &Path) -> Result<bool, IoError> {
@@ -205,10 +221,9 @@ pub fn check_for_file_in_folder(file_path: &Path, folder_path: &Path) -> Result<
     Ok(file_parent.starts_with(folder_path))
 }
 
-/// # `find_project_root`
 /// Finds the root directory of a project by searching for a `.git` directory.
 ///
-/// ## Errors
+/// # Errors
 /// * If getting the current directory fails
 /// * If the project root is not found
 ///

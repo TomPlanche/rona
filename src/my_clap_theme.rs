@@ -1,7 +1,6 @@
-///
-/// # `my_theme.rs`
-/// Code for custom dialoguer `MultiSelect` `ColorfulTheme`
-/// @see [theme trait doc](https://docs.rs/dialoguer/latest/dialoguer/theme/trait.Theme.html)
+//! Code for custom dialoguer `MultiSelect` `ColorfulTheme`
+//! @see [theme trait doc](https://docs.rs/dialoguer/latest/dialoguer/theme/trait.Theme.html)
+
 use std::fmt;
 
 use console::{Style, StyledObject, style};
