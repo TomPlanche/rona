@@ -41,6 +41,10 @@ end
 # Base command
 complete -c rona -f
 
+# Global flags
+complete -c rona -s v -l version -d "Print version information"
+complete -c rona -s h -l help -d "Print help information"
+
 # Subcommands
 complete -c rona -n "__fish_use_subcommand" -a "add-with-exclude commit generate init list-status push set-editor"
 

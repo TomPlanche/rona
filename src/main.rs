@@ -32,6 +32,7 @@ use git_related::find_git_root;
 use utils::print_error;
 
 fn main() {
+    // Only check for git repository if we got past the initial CLI parsing
     if find_git_root().is_err() {
         print_error(
             "Git repository not found",
