@@ -43,26 +43,11 @@ trait MessageType {
 
 // Define the message types
 struct Error;
-struct Warning;
-struct Success;
-struct Info;
 
 // Implement the MessageType trait for each type
 impl MessageType for Error {
     const PREFIX: &'static str = "🚨 ERROR";
     const TO_STDERR: bool = true;
-}
-
-impl MessageType for Warning {
-    const PREFIX: &'static str = "⚠️ WARNING";
-}
-
-impl MessageType for Success {
-    const PREFIX: &'static str = "✅ SUCCESS";
-}
-
-impl MessageType for Info {
-    const PREFIX: &'static str = "ℹ️ INFO";
 }
 
 /// Formats a message without suggestion.
@@ -94,24 +79,6 @@ fn format_message_with_suggestion<T: MessageType>(
     format!("{}\n\n{suggestion}", format_message::<T>(title, details))
 }
 
-/// Prints a message without suggestion.
-///
-/// # Arguments
-/// * `title` - The title of the message.
-/// * `details` - The details of the message.
-///
-/// # Returns
-/// * String - The formatted message.
-fn print_message<T: MessageType>(title: &str, details: &str) {
-    let message = format_message::<T>(title, details);
-
-    if T::TO_STDERR {
-        eprintln!("{message}");
-    } else {
-        println!("{message}");
-    }
-}
-
 /// Prints a message with suggestion.
 ///
 /// # Arguments
@@ -138,33 +105,6 @@ fn print_message_with_suggestion<T: MessageType>(title: &str, details: &str, sug
 /// - `suggestion`: The suggestion for resolving the error.
 pub fn print_error(title: &str, details: &str, suggestion: &str) {
     print_message_with_suggestion::<Error>(title, details, suggestion);
-}
-
-/// Prints a warning message with a consistent format for user-friendly display.
-///
-/// # Arguments
-/// - `title`: The title of the warning message.
-/// - `details`: The details of the warning message.
-pub fn print_warning(title: &str, details: &str) {
-    print_message::<Warning>(title, details);
-}
-
-/// Prints a success message with a consistent format for user-friendly display.
-///
-/// # Arguments
-/// - `title`: The title of the success message.
-/// - `details`: The details of the success message.
-pub fn print_success(title: &str, details: &str) {
-    print_message::<Success>(title, details);
-}
-
-/// Prints an informational message with a consistent format for user-friendly display.
-///
-/// # Arguments
-/// - `title`: The title of the informational message.
-/// - `details`: The details of the informational message.
-pub fn print_info(title: &str, details: &str) {
-    print_message::<Info>(title, details);
 }
 
 /// Formats a list of items with a consistent format for user-friendly display.
@@ -293,28 +233,5 @@ mod tests {
         // Single item
         let single = vec!["item"];
         assert_eq!(format_list(&single), "  - item");
-    }
-
-    #[test]
-    fn test_message_formatting() {
-        // Test error message format
-        let error_msg = format_message::<Error>("Test Error", "Error details");
-        assert!(error_msg.contains("🚨 ERROR"));
-        assert!(error_msg.contains("Test Error"));
-        assert!(error_msg.contains("Error details"));
-
-        // Test success message format
-        let success_msg = format_message::<Success>("Test Success", "Success details");
-        assert!(success_msg.contains("✅ SUCCESS"));
-        assert!(success_msg.contains("Test Success"));
-        assert!(success_msg.contains("Success details"));
-
-        // Test with suggestion
-        let error_with_suggestion = format_message_with_suggestion::<Error>(
-            "Test Error",
-            "Error details",
-            "Try this instead",
-        );
-        assert!(error_with_suggestion.contains("Try this instead"));
     }
 }

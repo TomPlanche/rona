@@ -29,7 +29,7 @@
 use std::{
     collections::HashSet,
     fs::{File, OpenOptions, read_to_string, write},
-    io::{self, Error, Result, Write},
+    io::{self, Error, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -38,6 +38,7 @@ use glob::Pattern;
 use regex::Regex;
 
 use crate::{
+    errors::{GitError, Result, RonaError},
     print_error,
     utils::{check_for_file_in_folder, find_project_root},
 };
@@ -153,7 +154,7 @@ pub fn create_needed_files() -> Result<()> {
 ///
 /// # Returns
 /// - `Ok(PathBuf)` - Path to the git repository root
-/// - `Err` - If not in a git repository or other errors occur
+/// - `Err(GitError)` - If not in a git repository or other errors occur
 pub fn find_git_root() -> Result<PathBuf> {
     let output = Command::new("git")
         .args(["rev-parse", "--git-dir"])
@@ -165,10 +166,10 @@ pub fn find_git_root() -> Result<PathBuf> {
         if git_root.exists() {
             Ok(git_root)
         } else {
-            Err(Error::new(io::ErrorKind::NotFound, "Git root not found"))
+            Err(RonaError::Git(GitError::RepositoryNotFound))
         }
     } else {
-        Err(Error::new(io::ErrorKind::NotFound, "Git root not found"))
+        Err(RonaError::Git(GitError::RepositoryNotFound))
     }
 }
 
@@ -204,17 +205,15 @@ pub fn format_branch_name(commit_types: &[&str; 4], branch: &str) -> String {
 /// # Returns
 /// * `String` - The current git branch
 pub fn get_current_branch() -> Result<String> {
-    // Get the current branch
     let output = Command::new("git")
         .arg("branch")
         .arg("--show-current")
         .output()?;
 
-    // Convert the output to a string
     let output_str = String::from_utf8_lossy(&output.stdout);
 
     if output_str.trim().is_empty() {
-        Err(Error::other("No branch found"))
+        Err(RonaError::Io(Error::other("No branch found")))
     } else {
         Ok(output_str.trim().to_string())
     }
@@ -428,7 +427,7 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
     if !commit_file_path.exists() {
-        return Err(Error::other("Commit message file not found"));
+        return Err(RonaError::Io(Error::other("Commit message file not found")));
     }
 
     let file_content = read_to_string(commit_file_path)?;
@@ -461,7 +460,7 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
             }
         }
 
-        Err(Error::other("Git commit failed"))
+        Err(RonaError::Io(Error::other("Git commit failed")))
     }
 }
 
@@ -521,7 +520,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<()> {
             }
         }
 
-        Err(Error::other("Git commit failed"))
+        Err(RonaError::Io(Error::other("Git commit failed")))
     }
 }
 
@@ -688,24 +687,19 @@ pub fn process_gitignore_file() -> Result<Vec<String>> {
 /// * If the git command fails
 ///
 /// # Returns
-/// * `Result<String, String>` - The git status or an error message
+/// * `Result<String>` - The git status or an error message
 pub fn read_git_status() -> Result<String> {
     let args = vec!["status", "--porcelain", "-u"];
     let command = Command::new("git").args(&args).output()?;
 
-    // If the command was successful
     if command.status.success() {
-        // Convert the output to a string
         let output = String::from_utf8_lossy(&command.stdout);
-
         Ok(output.to_string())
     } else {
         let error_message = String::from_utf8_lossy(&command.stderr);
-
-        Err(Error::new(
-            io::ErrorKind::InvalidData,
-            format!("`read_git_status` failed: {error_message}"),
-        ))
+        Err(RonaError::Git(GitError::CommandFailed(
+            error_message.to_string(),
+        )))
     }
 }
 
@@ -716,18 +710,10 @@ pub fn read_git_status() -> Result<String> {
 /// * If the filename cannot be captured from a line
 ///
 /// # Returns
-/// * `Result<Vec<String>, String>` - The extracted filenames or an error message
+/// * `Result<Vec<String>>` - The extracted filenames or an error message
 fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
-    let regex = Regex::new(pattern);
-
-    if regex.is_err() {
-        return Err(Error::new(
-            io::ErrorKind::InvalidData,
-            format!("`extract_filenames` failed to compile regex pattern: {pattern}"),
-        ));
-    }
-
-    let regex = regex.unwrap();
+    let regex = Regex::new(pattern)
+        .map_err(|e| GitError::InvalidStatus(format!("Failed to compile regex pattern: {e}")))?;
 
     let mut result = Vec::new();
     for line in message.lines() {

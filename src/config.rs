@@ -24,48 +24,13 @@
 use regex::Regex;
 use std::{env, fs, path::PathBuf};
 
-use crate::utils::print_error;
+use crate::{
+    errors::{ConfigError, GitError, Result},
+    utils::print_error,
+};
 
 // Make this public so tests can use it directly
 pub const CONFIG_FOLDER_NAME: &str = "rona-test-config";
-
-/// Custom error type for configuration operations
-#[derive(Debug)]
-pub enum ConfigError {
-    IoError(std::io::Error),
-    RegexError(regex::Error),
-    ConfigNotFound,
-    ConfigAlreadyExists,
-    InvalidConfig,
-    HomeDirNotFound,
-}
-
-impl std::fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConfigError::IoError(e) => write!(f, "IO error: {e}"),
-            ConfigError::RegexError(e) => write!(f, "Regex error: {e}"),
-            ConfigError::ConfigNotFound => write!(f, "Configuration file not found"),
-            ConfigError::ConfigAlreadyExists => write!(f, "Configuration file already exists"),
-            ConfigError::InvalidConfig => write!(f, "Invalid configuration file"),
-            ConfigError::HomeDirNotFound => write!(f, "Could not determine home directory"),
-        }
-    }
-}
-
-impl std::error::Error for ConfigError {}
-
-impl From<std::io::Error> for ConfigError {
-    fn from(error: std::io::Error) -> Self {
-        ConfigError::IoError(error)
-    }
-}
-
-impl From<regex::Error> for ConfigError {
-    fn from(error: regex::Error) -> Self {
-        ConfigError::RegexError(error)
-    }
-}
 
 /// Main configuration struct that handles all config operations
 pub struct Config {
@@ -77,9 +42,8 @@ impl Config {
     ///
     /// # Errors
     /// * When getting the config root fails
-    pub fn new() -> Result<Self, ConfigError> {
+    pub fn new() -> Result<Self> {
         let root = Config::get_config_root()?;
-
         Ok(Config { root })
     }
 
@@ -97,7 +61,7 @@ impl Config {
     /// * If the configuration file cannot be read, or if it is inexistent.
     /// * If the regex pattern fails to compile.
     /// * If the regex pattern fails to match the editor.
-    pub fn get_editor(&self) -> Result<String, ConfigError> {
+    pub fn get_editor(&self) -> Result<String> {
         let config_file = self.get_config_file_path()?;
 
         if !config_file.exists() {
@@ -109,7 +73,7 @@ impl Config {
                 );
             }
 
-            return Err(ConfigError::ConfigNotFound);
+            return Err(ConfigError::ConfigNotFound.into());
         }
 
         let config_content = fs::read_to_string(&config_file)?;
@@ -131,7 +95,7 @@ impl Config {
     ///
     /// # Errors
     /// * if the configuration file cannot be read or written.
-    pub fn set_editor(&self, editor: &str) -> Result<(), ConfigError> {
+    pub fn set_editor(&self, editor: &str) -> Result<()> {
         let config_file = self.get_config_file_path()?;
 
         if !config_file.exists() {
@@ -143,7 +107,7 @@ impl Config {
                 );
             }
 
-            return Err(ConfigError::ConfigNotFound);
+            return Err(ConfigError::ConfigNotFound.into());
         }
 
         let config_content = fs::read_to_string(&config_file)?;
@@ -166,7 +130,7 @@ impl Config {
     /// # Errors
     /// * If an I/O error occurs while creating the configuration file
     /// * If the file already exists
-    pub fn create_config_file(&self, editor: &str) -> Result<(), ConfigError> {
+    pub fn create_config_file(&self, editor: &str) -> Result<()> {
         let config_folder = self.get_config_folder_path()?;
 
         if !config_folder.exists() {
@@ -188,7 +152,7 @@ impl Config {
                 );
             }
 
-            return Err(ConfigError::ConfigAlreadyExists);
+            return Err(ConfigError::ConfigAlreadyExists.into());
         }
 
         fs::write(&config_file, config_content)?;
@@ -203,9 +167,8 @@ impl Config {
     ///
     /// # Returns
     /// The path to the configuration folder.
-    pub fn get_config_folder_path(&self) -> Result<PathBuf, ConfigError> {
+    pub fn get_config_folder_path(&self) -> Result<PathBuf> {
         let config_folder_path = self.root.join(".config").join("rona");
-
         Ok(config_folder_path)
     }
 
@@ -216,9 +179,8 @@ impl Config {
     ///
     /// # Returns
     /// The path to the configuration file
-    pub fn get_config_file_path(&self) -> Result<PathBuf, ConfigError> {
+    pub fn get_config_file_path(&self) -> Result<PathBuf> {
         let config_folder_path = self.get_config_folder_path()?;
-
         Ok(config_folder_path.join("config.toml"))
     }
 
@@ -229,7 +191,7 @@ impl Config {
     ///
     /// # Returns
     /// The root directory for the configuration files
-    fn get_config_root() -> Result<PathBuf, ConfigError> {
+    fn get_config_root() -> Result<PathBuf> {
         // Use environment variable for testing
         if env::var("RONA_TEST_DIR").is_ok() || cfg!(test) {
             Ok(PathBuf::from(CONFIG_FOLDER_NAME))
@@ -237,7 +199,7 @@ impl Config {
             let root = env::var("HOME").or_else(|_| env::var("USERPROFILE"));
 
             if root.is_err() {
-                return Err(ConfigError::HomeDirNotFound);
+                return Err(GitError::RepositoryNotFound.into());
             }
 
             Ok(PathBuf::from(root.unwrap()))
@@ -251,19 +213,15 @@ impl Config {
     ///
     /// # Returns
     /// The regex to match the editor in the configuration file
-    fn get_regex_editor() -> Result<Regex, ConfigError> {
-        let regex = Regex::new(r#"editor\s*=\s*"(.*?)""#);
-
-        if regex.is_err() {
-            return Err(ConfigError::RegexError(regex.err().unwrap()));
-        }
-
-        Ok(regex?)
+    fn get_regex_editor() -> Result<Regex> {
+        Regex::new(r#"editor\s*=\s*"(.*?)""#).map_err(|e| ConfigError::RegexError(e).into())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::RonaError;
+
     use super::*;
     use tempfile::TempDir;
 
@@ -329,7 +287,7 @@ mod tests {
         // Don't create a config file, verify we get an error
         assert!(matches!(
             config.get_editor(),
-            Err(ConfigError::ConfigNotFound)
+            Err(RonaError::Config(ConfigError::ConfigNotFound))
         ));
     }
 
@@ -341,7 +299,7 @@ mod tests {
         // Don't create a config file, verify we get an error
         assert!(matches!(
             config.set_editor("vim"),
-            Err(ConfigError::ConfigNotFound)
+            Err(RonaError::Config(ConfigError::ConfigNotFound))
         ));
     }
 
@@ -361,7 +319,7 @@ mod tests {
         // Test that get_editor returns an error
         assert!(matches!(
             config.get_editor(),
-            Err(ConfigError::InvalidConfig)
+            Err(RonaError::Config(ConfigError::InvalidConfig))
         ));
     }
 }

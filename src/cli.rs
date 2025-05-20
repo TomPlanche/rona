@@ -26,6 +26,7 @@
 
 use crate::{
     config::Config,
+    errors::Result,
     git_related::{
         COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, generate_commit_message,
         get_status_files, git_add_with_exclude_patterns, git_commit, git_push,
@@ -122,7 +123,7 @@ pub struct Cli {
 ///
 /// # Errors
 /// * Return an error if the command fails.
-pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     // If no command is provided, the parser will handle --version and --help automatically
@@ -145,7 +146,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             git_commit(&args, cli.verbose)?;
 
             if push {
-                git_push(&Vec::new(), cli.verbose)?;
+                git_push(&args, cli.verbose)?;
             }
         }
         Commands::ListStatus => {
