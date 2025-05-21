@@ -27,21 +27,12 @@ pub mod git_related;
 pub mod my_clap_theme;
 pub mod utils;
 
-use std::process::exit;
-
 use cli::run;
 use errors::Result;
-use git_related::find_git_root;
+use std::process::exit;
 use utils::print_error;
 
 fn main() {
-    // Only check for git repository if we got past the initial CLI parsing
-    if let Err(e) = find_git_root() {
-        eprintln!("{e}");
-
-        exit(1);
-    }
-
     if let Err(e) = inner_main() {
         println!("Rona error:\n{e}");
 
