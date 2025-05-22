@@ -539,89 +539,120 @@ pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<()> {
 /// * `verbose` - `bool` - Verbose the operation
 pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
     let commit_message_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
-    let commitignore_path = Path::new(COMMITIGNORE_FILE_PATH);
 
+    // Empty the file if it exists
     if commit_message_path.exists() {
-        // Empty the file
         write(commit_message_path, "")?;
     }
 
+    // Get git status info
     let git_status = read_git_status()?;
     let modified_files = process_git_status(&git_status)?;
     let deleted_files = process_deleted_files(&git_status)?;
 
-    // The commit message file
+    // Open commit file for writing
     let mut commit_file = OpenOptions::new()
         .append(true)
         .create(true)
         .open(commit_message_path)?;
 
-    let commit_number = get_current_commit_nb()? + 1;
-    let branch_name: &str = &format_branch_name(&COMMIT_TYPES, &get_current_branch()?);
+    // Write header
+    write_commit_header(&mut commit_file, commit_type)?;
 
-    writeln!(
-        commit_file,
-        "[{commit_number}] ({commit_type} on {branch_name})\n\n"
-    )?;
+    // Get files to ignore
+    let ignore_patterns = get_ignore_patterns()?;
 
+    // Process modified files
     for file in modified_files {
-        // If the file is not a file in the commitignore file
-        // or is not in a folder in the commitignore file
-        if commitignore_path.exists() {
-            let mut items_to_ignore: Vec<String> = process_gitignore_file()?;
-            items_to_ignore.append(&mut process_gitignore_file()?);
-
-            // Check if the file/folder is in the commitignore file or gitignore file
-            if items_to_ignore.contains(&file) {
-                // continue means skip the current iteration
-                continue;
-            }
-
-            // This variable is used to call the 'continue' statement
-            // just before the 'writeln!' macro.
-            // I can't use the 'continue' statement directly in the for loop
-            // because it will skip the next item, not a file.
-            let mut need_to_skip = false;
-
-            // for each item in the commitignore file and gitignore file,
-            // check for a file in the folder,
-            // for example,
-            // `data/year_2015/puzzles/` in the commitignore file can
-            // exclude `data/year_2015/puzzles/day_01.md` from the commit
-            // and in general `data/year_2015/puzzles/*` from the commit
-            for item in items_to_ignore {
-                let item_path = Path::new(&item);
-                let file_path = Path::new(&file);
-
-                if check_for_file_in_folder(file_path, item_path)? {
-                    need_to_skip = true;
-                }
-            }
-
-            if need_to_skip {
-                // Skip the current file so the file is not added to the commit message
-                continue;
-            }
+        if !should_ignore_file(&file, &ignore_patterns)? {
+            writeln!(commit_file, "- `{file}`:\n\n\t\n")?;
         }
-
-        writeln!(commit_file, "- `{file}`:\n\n\t\n")?;
     }
 
-    // For each deleted file
+    // Process deleted files
     for file in deleted_files {
         writeln!(commit_file, "- `{file}`: deleted\n")?;
     }
 
     // Close the file
     commit_file.flush()?;
-    drop(commit_file);
 
     if verbose {
-        // Print a message
         println!("{COMMIT_MESSAGE_FILE_PATH} created ✅ ");
     }
 
     Ok(())
+}
+
+/// Writes the commit header to the commit file.
+///
+/// # Arguments
+/// * `commit_file` - The file to write to
+/// * `commit_type` - The type of commit
+///
+/// # Errors
+/// * If writing to the file fails
+fn write_commit_header(commit_file: &mut File, commit_type: &str) -> Result<()> {
+    let commit_number = get_current_commit_nb()? + 1;
+    let branch_name = format_branch_name(&COMMIT_TYPES, &get_current_branch()?);
+
+    writeln!(
+        commit_file,
+        "[{commit_number}] ({commit_type} on {branch_name})\n\n"
+    )?;
+
+    Ok(())
+}
+
+/// Gets all patterns from commitignore and gitignore files.
+///
+/// # Errors
+/// * If reading the ignore files fails
+///
+/// # Returns
+/// * A vector of patterns to ignore
+fn get_ignore_patterns() -> Result<Vec<String>> {
+    let commitignore_path = Path::new(COMMITIGNORE_FILE_PATH);
+
+    if !commitignore_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut patterns = process_gitignore_file()?;
+    patterns.append(&mut process_gitignore_file()?);
+
+    Ok(patterns)
+}
+
+/// Checks if a file should be ignored based on ignore patterns.
+///
+/// # Arguments
+/// * `file` - The file to check
+/// * `ignore_patterns` - Patterns to check against
+///
+/// # Errors
+/// * If checking file paths fails
+///
+/// # Returns
+/// * `true` if the file should be ignored, `false` otherwise
+fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
+    // Check if the file is directly in the ignore list
+    if ignore_patterns.contains(&file.to_string()) {
+        return Ok(true);
+    }
+
+    // Check if the file is in a folder that's in the ignore list
+    let file_path = Path::new(file);
+
+    for item in ignore_patterns {
+        let item_path = Path::new(item);
+
+        if check_for_file_in_folder(file_path, item_path)? {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// Processes the deleted files from git status output.
