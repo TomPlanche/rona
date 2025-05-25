@@ -23,7 +23,7 @@ Rona is a command-line interface tool designed to enhance your Git workflow with
 - 📝 Structured commit message generation
 - 🔄 Streamlined push operations
 - 🎯 Interactive commit type selection
-- 🛠 Fish shell completion support
+- 🛠 Multi-shell completion support (Bash, Fish, Zsh, PowerShell)
 
 ## Installation
 
@@ -74,6 +74,20 @@ Commit changes using prepared message.
 rona commit [extra args]
 # or
 rona -c [-p | --push] [extra args]
+```
+
+### `completion`
+Generate shell completion scripts.
+
+```bash
+rona completion <shell>
+```
+
+**Supported shells:** `bash`, `fish`, `zsh`, `powershell`
+
+**Example:**
+```bash
+rona completion fish > ~/.config/fish/completions/rona.fish
 ```
 
 ### `generate` (`-g`)
@@ -132,14 +146,58 @@ rona help
 rona -h
 ```
 
-## Shell Integration
+## Shell Completion
 
-### Fish Shell Completion
-Add the following to your Fish configuration:
+Rona supports auto-completion for multiple shells using [`clap_complete`](https://docs.rs/clap_complete/latest/clap_complete/index.html).
 
-```fish
-source /path/to/rona/completions/rona.fish
+### Generate Completions
+
+Generate completion files for your shell:
+
+```bash
+# Generate completions for specific shell
+rona completion fish    # Fish shell
+rona completion bash    # Bash
+rona completion zsh     # Zsh  
+rona completion powershell  # PowerShell
+
+# Save to file
+rona completion fish > ~/.config/fish/completions/rona.fish
 ```
+
+### Installation by Shell
+
+**Fish Shell:**
+```fish
+# Copy to Fish completions directory
+rona completion fish > ~/.config/fish/completions/rona.fish
+```
+
+**Bash:**
+```bash
+# Add to your .bashrc
+rona completion bash >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Zsh:**
+```bash
+# Add to your .zshrc or save to a completions directory
+rona completion zsh >> ~/.zshrc
+```
+
+**PowerShell:**
+```powershell
+# Add to your PowerShell profile
+rona completion powershell | Out-File -Append $PROFILE
+```
+
+### Features
+
+The completions include:
+- All command and flag completions
+- Git status file completion for `add-with-exclude` command (Fish only)
+- Context-aware suggestions
 
 ## Development
 

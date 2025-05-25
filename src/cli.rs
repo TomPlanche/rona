@@ -33,10 +33,11 @@ use crate::{
     },
     my_clap_theme,
 };
-use clap::{Parser, Subcommand, command};
+use clap::{Command as ClapCommand, CommandFactory, Parser, Subcommand, command};
+use clap_complete::{Shell, generate};
 use dialoguer::Select;
 use glob::Pattern;
-use std::process::Command;
+use std::{io, process::Command};
 
 /// CLI's commands
 #[derive(Subcommand)]
@@ -59,6 +60,14 @@ pub(crate) enum CliCommand {
         /// Additionnal arguments to pass to the commit command
         #[arg(allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+
+    /// Generate shell completions for your shell
+    #[command(name = "completion")]
+    Completion {
+        /// The shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
     },
 
     /// Directly generate the `commit_message.md` file.
@@ -116,6 +125,27 @@ pub(crate) struct Cli {
     verbose: bool,
 }
 
+/// Build the CLI command structure for generating completions
+fn build_cli() -> ClapCommand {
+    Cli::command()
+}
+
+/// Print custom fish shell completions that enhance the auto-generated ones
+fn print_fish_custom_completions() {
+    println!();
+    println!("# === CUSTOM RONA COMPLETIONS ===");
+    println!("# Helper function to get git status files");
+    println!("function __rona_status_files");
+    println!("    rona -l");
+    println!("end");
+    println!();
+    println!("# Command-specific completions");
+    println!("# add-with-exclude: Complete with git status files");
+    println!(
+        "complete -c rona -n '__fish_seen_subcommand_from add-with-exclude -a' -xa '(__rona_status_files)'"
+    );
+}
+
 /// Runs the program.
 ///
 /// # Panics
@@ -142,6 +172,15 @@ pub fn run() -> Result<()> {
 
             if push {
                 git_push(&args, cli.verbose)?;
+            }
+        }
+        CliCommand::Completion { shell } => {
+            let mut cmd = build_cli();
+            generate(shell, &mut cmd, "rona", &mut io::stdout());
+
+            // Add custom completions for fish shell
+            if matches!(shell, Shell::Fish) {
+                print_fish_custom_completions();
             }
         }
         CliCommand::ListStatus => {
