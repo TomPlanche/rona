@@ -32,23 +32,150 @@ cargo install rona
 rona init [editor] # The editor to use for commit messages [vim, zed] (default: nano)
 ```
 
-## Quick Start
+## Usage Examples
 
-1. Add files excluding patterns:
+### Basic Workflow
+
+1. Initialize Rona with your preferred editor:
 ```bash
-rona -a "*.rs"  # Exclude all Rust files
+# Initialize with Vim
+rona init vim
+
+# Initialize with Zed
+rona init zed
+
+# Initialize with default editor (nano)
+rona init
 ```
 
-2. Generate commit message:
+2. Stage files while excluding specific patterns:
 ```bash
-rona -g  # Opens interactive commit type selector
+# Exclude Rust files
+rona -a "*.rs"
+
+# Exclude multiple file types
+rona -a "*.rs" "*.tmp" "*.log"
+
+# Exclude directories
+rona -a "target/" "node_modules/"
+
+# Exclude files with specific patterns
+rona -a "test_*.rs" "*.test.js"
 ```
 
-3. Commit changes:
+3. Generate and edit commit message:
 ```bash
-rona -c [ARGS] # Commits using message from commit_message.md
-# Push changes to remote repository
-rona -cp [ARGS] # here, the args will be passed to git commit
+# Generate commit message template
+rona -g
+
+# This will:
+# 1. Open an interactive commit type selector
+# 2. Create/update commit_message.md
+# 3. Open your configured editor to edit the message
+```
+
+4. Commit and push changes:
+```bash
+# Commit with the prepared message
+rona -c
+
+# Commit and push in one command
+rona -cp
+
+# Commit with additional Git arguments
+rona -c --no-verify
+
+# Commit and push with specific branch
+rona -cp origin main
+```
+
+### Advanced Usage
+
+#### Working with Multiple Branches
+
+```bash
+# Create and switch to a new feature branch
+git checkout -b feature/new-feature
+rona -a "*.rs"
+rona -g
+rona -cp
+
+# Switch back to main and merge
+git checkout main
+git merge feature/new-feature
+```
+
+#### Handling Large Changes
+
+```bash
+# Stage specific directories
+rona -a "src/" "tests/"
+
+# Exclude test files while staging
+rona -a "src/" -e "test_*.rs"
+
+# Stage everything except specific patterns
+rona -a "*" -e "*.log" "*.tmp"
+```
+
+#### Using with CI/CD
+
+```bash
+# In your CI pipeline
+rona init
+rona -a "*"
+rona -g
+rona -cp --no-verify
+```
+
+#### Shell Integration
+
+```bash
+# Fish shell
+echo "function rona
+    command rona \$argv
+end" >> ~/.config/fish/functions/rona.fish
+
+# Bash
+echo 'alias rona="command rona"' >> ~/.bashrc
+```
+
+### Common Use Cases
+
+1. **Feature Development**:
+```bash
+# Start new feature
+git checkout -b feature/new-feature
+rona -a "src/" "tests/"
+rona -g  # Select 'feat' type
+rona -cp
+```
+
+2. **Bug Fixes**:
+```bash
+# Fix a bug
+git checkout -b fix/bug-description
+rona -a "src/"
+rona -g  # Select 'fix' type
+rona -cp
+```
+
+3. **Code Cleanup**:
+```bash
+# Clean up code
+git checkout -b chore/cleanup
+rona -a "src/" -e "*.rs"
+rona -g  # Select 'chore' type
+rona -cp
+```
+
+4. **Testing**:
+```bash
+# Add tests
+git checkout -b test/add-tests
+rona -a "tests/"
+rona -g  # Select 'test' type
+rona -cp
 ```
 
 ## Command Reference

@@ -1,7 +1,34 @@
-//! Rona - A Git Repository Management Tool
+//! # Rona - Git Workflow Enhancement Tool
 //!
-//! This is the main entry point for the Rona application. Rona is designed to help
-//! manage Git repositories with enhanced functionality and user-friendly interfaces.
+//! Rona is a command-line interface tool designed to enhance your Git workflow with powerful features
+//! and intuitive commands. It simplifies common Git operations and provides additional functionality
+//! for managing commits, files, and repository status.
+//!
+//! ## Key Features
+//!
+//! - Intelligent file staging with pattern exclusion
+//! - Structured commit message generation
+//! - Streamlined push operations
+//! - Interactive commit type selection
+//! - Multi-shell completion support
+//!
+//! ## Usage
+//!
+//! ```bash
+//! # Initialize Rona
+//! rona init [editor]
+//!
+//! # Add files excluding patterns
+//! rona -a "*.rs"
+//!
+//! # Generate commit message
+//! rona -g
+//!
+//! # Commit and push changes
+//! rona -cp
+//! ```
+//!
+//! For more detailed examples and usage instructions, see the [README.md](../README.md) file.
 //!
 //! # Architecture
 //!

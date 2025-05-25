@@ -1,34 +1,38 @@
-//! Git Integration Module for Rona
+//! # Git Operations Module
 //!
-//! This module provides comprehensive Git integration functionality, including
-//! - Git repository management
-//! - Commit message generation and handling
-//! - Git ignore patterns management
-//! - Branch operations
+//! This module provides core Git-related functionality for the Rona CLI tool. It handles
+//! various Git operations, including commit management, file staging, and repository status.
 //!
-//! # Core Features
+//! ## Key Components
 //!
-//! - Repository detection and validation
-//! - Commit message file management
-//! - Git status processing
-//! - Branch name formatting
-//! - Git command execution wrappers
+//! - Commit message generation and management
+//! - File staging with pattern exclusion
+//! - Repository status tracking
+//! - Git configuration management
 //!
-//! # Constants
+//! ## Examples
 //!
-//! - `COMMIT_MESSAGE_FILE_PATH`: Path to the commit message file
-//! - `COMMIT_TYPES`: Available commit types (chore, feat, fix, test)
-//! - `COMMITIGNORE_FILE_PATH`: Path to the commit ignore file
-//! - `GITIGNORE_FILE_PATH`: Path to the git ignore file
+//! ```rust
+//! use rona::git_related::{generate_commit_message, add_with_exclude};
 //!
-//! # Error Handling
+//! // Generate a commit message
+//! let commit_type = "feat";
+//! let message = generate_commit_message(commit_type)?;
 //!
-//! All functions return `Result` types to properly handle Git-related errors
-//! and provide meaningful error messages to users.
+//! // Add files while excluding patterns
+//! let patterns = vec!["*.rs", "*.tmp"];
+//! add_with_exclude(&patterns)?;
+//! ```
+//!
+//! ## Error Handling
+//!
+//! All Git operations return a `Result` type that can contain either the operation's
+//! success value or a `RonaError`. This ensures proper error propagation and handling
+//! throughout the application.
 
 use std::{
     collections::HashSet,
-    fs::{File, OpenOptions, read_to_string, write},
+    fs::{read_to_string, write, File, OpenOptions},
     io::{self, Error, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -416,7 +420,7 @@ pub fn get_status_files() -> Result<Vec<String>> {
 ///
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
+pub fn git_commit(args: &[String], verbose: bool) -> Result<()> {
     if verbose {
         println!("Committing files...");
     }
@@ -431,11 +435,19 @@ pub fn git_commit(args: &Vec<String>, verbose: bool) -> Result<()> {
     }
 
     let file_content = read_to_string(commit_file_path)?;
+
+    // Filter out conflicting flags
+    let filtered_args: Vec<String> = args
+        .iter()
+        .filter(|arg| !arg.starts_with("-c") && !arg.starts_with("--commit"))
+        .cloned()
+        .collect();
+
     let output = Command::new("git")
         .arg("commit")
         .arg("-m")
         .arg(file_content)
-        .args(args)
+        .args(&filtered_args)
         .output()?;
 
     if output.status.success() {
@@ -550,7 +562,7 @@ pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
     let modified_files = process_git_status(&git_status)?;
     let deleted_files = process_deleted_files(&git_status)?;
 
-    // Open commit file for writing
+    // Open the commit file for writing
     let mut commit_file = OpenOptions::new()
         .append(true)
         .create(true)
@@ -607,7 +619,7 @@ fn write_commit_header(commit_file: &mut File, commit_type: &str) -> Result<()> 
 /// Gets all patterns from commitignore and gitignore files.
 ///
 /// # Errors
-/// * If reading the ignore files fails
+/// * If reading the ignored files fails
 ///
 /// # Returns
 /// * A vector of patterns to ignore
@@ -624,7 +636,7 @@ fn get_ignore_patterns() -> Result<Vec<String>> {
     Ok(patterns)
 }
 
-/// Checks if a file should be ignored based on ignore patterns.
+/// Checks if a file should be ignored based on ignored patterns.
 ///
 /// # Arguments
 /// * `file` - The file to check
