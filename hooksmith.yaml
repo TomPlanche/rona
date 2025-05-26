@@ -3,9 +3,10 @@ pre-commit:
         - cargo fmt --all -- --check
         - cargo clippy --workspace --release --all-targets --all-features -- --deny warnings -D warnings -W clippy::correctness -W clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::style -W clippy::pedantic
         - cargo run -- completion bash > completions/rona.bash
-        - cargo run -- completion zsh > completions/rona.zsh
+        - cargo run -- completion elvish > completions/rona.elv
         - cargo run -- completion fish > completions/rona.fish
         - cargo run -- completion powershell > completions/rona.ps1
+        - cargo run -- completion zsh > completions/rona.zsh
         - git add completions/rona*
 pre-push:
     commands:
