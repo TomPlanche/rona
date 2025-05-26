@@ -32,7 +32,7 @@
 
 use std::{
     collections::HashSet,
-    fs::{read_to_string, write, File, OpenOptions},
+    fs::{File, OpenOptions, read_to_string, write},
     io::{self, Error, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -306,7 +306,12 @@ pub fn get_current_commit_nb() -> Result<u16> {
 /// # Arguments
 /// * `exclude_patterns` - List of patterns to exclude
 /// * `verbose` - Whether to print verbose output
-pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool) -> Result<()> {
+/// * `dry_run` - If true, only show what would be added without actually staging files
+pub fn git_add_with_exclude_patterns(
+    exclude_patterns: &[Pattern],
+    verbose: bool,
+    dry_run: bool,
+) -> Result<()> {
     if verbose {
         println!("Adding files...");
     }
@@ -330,6 +335,24 @@ pub fn git_add_with_exclude_patterns(exclude_patterns: &[Pattern], verbose: bool
     if files_to_add.is_empty() && deleted_files.is_empty() {
         println!("No files to add or delete");
     } else {
+        if dry_run {
+            println!("Would add {} files:", files_to_add.len());
+            for file in &files_to_add {
+                println!("  + {file}");
+            }
+            if !deleted_files.is_empty() {
+                println!("Would delete {} files:", deleted_files.len());
+                for file in &deleted_files {
+                    println!("  - {file}");
+                }
+            }
+            let excluded_count = staged_files_len - files_to_add.len();
+            if excluded_count > 0 {
+                println!("Would exclude {excluded_count} files");
+            }
+            return Ok(());
+        }
+
         let top_level_dir = git_get_top_level_path()?;
         std::env::set_current_dir(&top_level_dir)?;
 
@@ -411,16 +434,36 @@ pub fn get_status_files() -> Result<Vec<String>> {
 
 /// Commits files to the git repository.
 ///
+/// This function reads the commit message from `commit_message.md` and creates
+/// a git commit with that message. Additional git arguments can be passed through.
+///
 /// # Arguments
-/// * `args` - The arguments to pass to the git commit command.
+/// * `args` - Additional arguments to pass to the git commit command
+/// * `verbose` - Whether to print verbose output during the operation
+/// * `dry_run` - If true, only show what would be committed without actually committing
 ///
 /// # Errors
-/// * If writing commit message fails
-/// * If git commit fails
+/// * If the commit message file doesn't exist
+/// * If reading the commit message file fails
+/// * If the git commit command fails
+/// * If not in a git repository
 ///
-/// # Returns
-/// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_commit(args: &[String], verbose: bool) -> Result<()> {
+/// # Examples
+///
+/// ```no_run
+/// use rona::git_related::git_commit;
+///
+/// // Basic commit
+/// git_commit(&[], false, false)?;
+///
+/// // Commit with additional git arguments
+/// git_commit(&["--amend".to_string()], true, false)?;
+///
+/// // Dry run to preview the commit
+/// git_commit(&[], false, true)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn git_commit(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
     if verbose {
         println!("Committing files...");
     }
@@ -442,6 +485,17 @@ pub fn git_commit(args: &[String], verbose: bool) -> Result<()> {
         .filter(|arg| !arg.starts_with("-c") && !arg.starts_with("--commit"))
         .cloned()
         .collect();
+
+    if dry_run {
+        println!("Would commit with message:");
+        println!("---");
+        println!("{}", file_content.trim());
+        println!("---");
+        if !filtered_args.is_empty() {
+            println!("With additional args: {filtered_args:?}");
+        }
+        return Ok(());
+    }
 
     let output = Command::new("git")
         .arg("commit")
@@ -494,18 +548,51 @@ pub fn git_get_top_level_path() -> Result<PathBuf> {
     Ok(git_top_level_path)
 }
 
-/// Pushes the changes.
+/// Pushes committed changes to the remote repository.
 ///
-/// * `args` - The arguments to pass to the git push command.
-/// * `verbose` - Whether to print verbose output.
+/// This function executes `git push` with optional additional arguments.
+/// It provides feedback on the operation's success or failure.
+///
+/// # Arguments
+/// * `args` - Additional arguments to pass to the git push command (e.g., `--force`, `origin main`)
+/// * `verbose` - Whether to print verbose output during the operation
+/// * `dry_run` - If true, only show what would be pushed without actually pushing
 ///
 /// # Errors
+/// * If the git push command fails
+/// * If not in a git repository
+/// * If no remote repository is configured
+/// * If authentication fails
 ///
-/// # Returns
-/// * `Result<(), Box<dyn std::error::Error>>`
-pub fn git_push(args: &Vec<String>, verbose: bool) -> Result<()> {
+/// # Examples
+///
+/// ```no_run
+/// use rona::git_related::git_push;
+///
+/// // Basic push
+/// git_push(&vec![], false, false)?;
+///
+/// // Push with force
+/// git_push(&vec!["--force".to_string()], true, false)?;
+///
+/// // Push to specific remote and branch
+/// git_push(&vec!["origin".to_string(), "main".to_string()], false, false)?;
+///
+/// // Dry run to preview the push
+/// git_push(&vec![], false, true)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn git_push(args: &Vec<String>, verbose: bool, dry_run: bool) -> Result<()> {
     if verbose {
         println!("\nPushing...");
+    }
+
+    if dry_run {
+        println!("Would push to remote repository");
+        if !args.is_empty() {
+            println!("With args: {args:?}");
+        }
+        return Ok(());
     }
 
     let output = Command::new("git").arg("push").args(args).output()?;
@@ -740,9 +827,10 @@ pub fn read_git_status() -> Result<String> {
         Ok(output.to_string())
     } else {
         let error_message = String::from_utf8_lossy(&command.stderr);
-        Err(RonaError::Git(GitError::CommandFailed(
-            error_message.to_string(),
-        )))
+        Err(RonaError::Git(GitError::CommandFailed {
+            command: "git rev-parse --abbrev-ref HEAD".to_string(),
+            output: error_message.to_string(),
+        }))
     }
 }
 
@@ -755,8 +843,9 @@ pub fn read_git_status() -> Result<String> {
 /// # Returns
 /// * `Result<Vec<String>>` - The extracted filenames or an error message
 fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
-    let regex = Regex::new(pattern)
-        .map_err(|e| GitError::InvalidStatus(format!("Failed to compile regex pattern: {e}")))?;
+    let regex = Regex::new(pattern).map_err(|e| GitError::InvalidStatus {
+        output: format!("Failed to compile regex pattern: {e}"),
+    })?;
 
     let mut result = Vec::new();
     for line in message.lines() {

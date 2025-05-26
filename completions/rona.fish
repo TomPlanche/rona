@@ -1,6 +1,6 @@
 # Print an optspec for argparse to handle cmd's options that are independent of any subcommand.
 function __fish_rona_global_optspecs
-	string join \n v/verbose h/help V/version
+	string join \n v/verbose config= h/help V/version
 end
 
 function __fish_rona_needs_command
@@ -24,7 +24,8 @@ function __fish_rona_using_subcommand
 	contains -- $cmd[1] $argv
 end
 
-complete -c rona -n "__fish_rona_needs_command" -s v -l verbose -d 'Verbose Optional \'verbose\' argument. Only works if a subcommand is passed. If passed, it will print more information about the operation'
+complete -c rona -n "__fish_rona_needs_command" -l config -d 'Use custom config file path instead of default' -r
+complete -c rona -n "__fish_rona_needs_command" -s v -l verbose -d 'Verbose output - show detailed information about operations'
 complete -c rona -n "__fish_rona_needs_command" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_needs_command" -s V -l version -d 'Print version'
 complete -c rona -n "__fish_rona_needs_command" -f -a "add-with-exclude" -d 'Add all files to the `git add` command and exclude the patterns passed as positional arguments'
@@ -36,14 +37,20 @@ complete -c rona -n "__fish_rona_needs_command" -f -a "list-status" -d 'List fil
 complete -c rona -n "__fish_rona_needs_command" -f -a "push" -d 'Push to a git repository'
 complete -c rona -n "__fish_rona_needs_command" -f -a "set-editor" -d 'Set the editor to use for editing the commit message'
 complete -c rona -n "__fish_rona_needs_command" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c rona -n "__fish_rona_using_subcommand add-with-exclude" -l dry-run -d 'Show what would be added without actually adding files'
 complete -c rona -n "__fish_rona_using_subcommand add-with-exclude" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand commit" -s p -l push -d 'Whether to push the commit after committing'
+complete -c rona -n "__fish_rona_using_subcommand commit" -l dry-run -d 'Show what would be committed without actually committing'
 complete -c rona -n "__fish_rona_using_subcommand commit" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand completion" -s h -l help -d 'Print help'
+complete -c rona -n "__fish_rona_using_subcommand generate" -l dry-run -d 'Show what would be generated without creating files'
 complete -c rona -n "__fish_rona_using_subcommand generate" -s h -l help -d 'Print help'
+complete -c rona -n "__fish_rona_using_subcommand init" -l dry-run -d 'Show what would be initialized without creating files'
 complete -c rona -n "__fish_rona_using_subcommand init" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand list-status" -s h -l help -d 'Print help'
+complete -c rona -n "__fish_rona_using_subcommand push" -l dry-run -d 'Show what would be pushed without actually pushing'
 complete -c rona -n "__fish_rona_using_subcommand push" -s h -l help -d 'Print help'
+complete -c rona -n "__fish_rona_using_subcommand set-editor" -l dry-run -d 'Show what would be changed without modifying config'
 complete -c rona -n "__fish_rona_using_subcommand set-editor" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand help; and not __fish_seen_subcommand_from add-with-exclude commit completion generate init list-status push set-editor help" -f -a "add-with-exclude" -d 'Add all files to the `git add` command and exclude the patterns passed as positional arguments'
 complete -c rona -n "__fish_rona_using_subcommand help; and not __fish_seen_subcommand_from add-with-exclude commit completion generate init list-status push set-editor help" -f -a "commit" -d 'Directly commit the file with the text in `commit_message.md`'

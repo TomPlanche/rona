@@ -19,6 +19,7 @@
 //! # Features
 //!
 //! - Supports verbose mode for detailed operation logging
+//! - Supports dry-run mode for previewing changes
 //! - Integrates with git commands
 //! - Provides shell completion capabilities
 //! - Handles configuration management
@@ -48,6 +49,10 @@ pub(crate) enum CliCommand {
         /// Patterns of files to exclude (supports glob patterns like `"node_modules/*"`)
         #[arg(value_name = "PATTERNS")]
         exclude: Vec<String>,
+
+        /// Show what would be added without actually adding files
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
     },
 
     /// Directly commit the file with the text in `commit_message.md`.
@@ -56,6 +61,10 @@ pub(crate) enum CliCommand {
         /// Whether to push the commit after committing
         #[arg(short = 'p', long = "push", default_value_t = false)]
         push: bool,
+
+        /// Show what would be committed without actually committing
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
 
         /// Additionnal arguments to pass to the commit command
         #[arg(allow_hyphen_values = true)]
@@ -72,7 +81,11 @@ pub(crate) enum CliCommand {
 
     /// Directly generate the `commit_message.md` file.
     #[command(short_flag = 'g')]
-    Generate,
+    Generate {
+        /// Show what would be generated without creating files
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
 
     /// Initialize the rona configuration file.
     #[command(short_flag = 'i', name = "init")]
@@ -80,6 +93,10 @@ pub(crate) enum CliCommand {
         /// Editor to use for the commit message.
         #[arg(default_value_t = String::from("nano"))]
         editor: String,
+
+        /// Show what would be initialized without creating files
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
     },
 
     /// List files from git status (for shell completion on the -a)
@@ -89,6 +106,10 @@ pub(crate) enum CliCommand {
     /// Push to a git repository.
     #[command(short_flag = 'p')]
     Push {
+        /// Show what would be pushed without actually pushing
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+
         /// Additionnal arguments to pass to the push command
         #[arg(allow_hyphen_values = true)]
         args: Vec<String>,
@@ -100,6 +121,10 @@ pub(crate) enum CliCommand {
         /// The editor to use for the commit message
         #[arg(value_name = "EDITOR")]
         editor: String,
+
+        /// Show what would be changed without modifying config
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
     },
 }
 
@@ -108,7 +133,8 @@ pub(crate) enum CliCommand {
 \t- Commit with the current 'commit_message.md' file text.\n\
 \t- Generate the 'commit_message.md' file.\n\
 \t- Push to git repository.\n\
-\t- Push to git repository.")]
+\t- Add files with pattern exclusion.\n\
+\nAll commands support --dry-run to preview changes.")]
 #[command(author = "Tom Planche <tomplanche@proton.me>")]
 #[command(help_template = "{about}\nMade by: {author}\n\nUSAGE:\n{usage}\n\n{all-args}\n")]
 #[command(name = "rona")]
@@ -118,11 +144,13 @@ pub(crate) struct Cli {
     #[command(subcommand)]
     pub(crate) command: CliCommand,
 
-    /// Verbose
-    /// Optional 'verbose' argument. Only works if a subcommand is passed.
-    /// If passed, it will print more information about the operation.
+    /// Verbose output - show detailed information about operations
     #[arg(short, long, default_value = "false")]
     verbose: bool,
+
+    /// Use custom config file path instead of default
+    #[arg(long, value_name = "PATH")]
+    config: Option<String>,
 }
 
 /// Build the CLI command structure for generating completions
@@ -159,19 +187,23 @@ pub fn run() -> Result<()> {
     let config = Config::new()?;
 
     match cli.command {
-        CliCommand::AddWithExclude { exclude } => {
+        CliCommand::AddWithExclude { exclude, dry_run } => {
             let patterns: Vec<Pattern> = exclude
                 .iter()
                 .map(|p| Pattern::new(p).expect("Invalid glob pattern"))
                 .collect();
 
-            git_add_with_exclude_patterns(&patterns, cli.verbose)?;
+            git_add_with_exclude_patterns(&patterns, cli.verbose, dry_run)?;
         }
-        CliCommand::Commit { args, push } => {
-            git_commit(&args, cli.verbose)?;
+        CliCommand::Commit {
+            args,
+            push,
+            dry_run,
+        } => {
+            git_commit(&args, cli.verbose, dry_run)?;
 
             if push {
-                git_push(&args, cli.verbose)?;
+                git_push(&args, cli.verbose, dry_run)?;
             }
         }
         CliCommand::Completion { shell } => {
@@ -191,7 +223,13 @@ pub fn run() -> Result<()> {
                 println!("{file}");
             }
         }
-        CliCommand::Generate => {
+        CliCommand::Generate { dry_run } => {
+            if dry_run {
+                println!("Would create files: commit_message.md, .commitignore");
+                println!("Would add files to .git/info/exclude");
+                return Ok(());
+            }
+
             create_needed_files()?;
 
             let commit_type =
@@ -212,13 +250,21 @@ pub fn run() -> Result<()> {
                 .wait()
                 .expect("Failed to wait for editor");
         }
-        CliCommand::Initialize { editor } => {
+        CliCommand::Initialize { editor, dry_run } => {
+            if dry_run {
+                println!("Would create config file with editor: {editor}");
+                return Ok(());
+            }
             config.create_config_file(&editor)?;
         }
-        CliCommand::Push { args } => {
-            git_push(&args, cli.verbose)?;
+        CliCommand::Push { args, dry_run } => {
+            git_push(&args, cli.verbose, dry_run)?;
         }
-        CliCommand::Set { editor } => {
+        CliCommand::Set { editor, dry_run } => {
+            if dry_run {
+                println!("Would set editor to: {editor}");
+                return Ok(());
+            }
             config.set_editor(&editor)?;
         }
     }
@@ -239,8 +285,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude } => {
+            CliCommand::AddWithExclude { exclude, dry_run } => {
                 assert!(exclude.is_empty());
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -252,8 +299,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude } => {
+            CliCommand::AddWithExclude { exclude, dry_run } => {
                 assert_eq!(exclude, vec!["*.txt"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -265,8 +313,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude } => {
+            CliCommand::AddWithExclude { exclude, dry_run } => {
                 assert_eq!(exclude, vec!["*.txt", "*.log", "target/*"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -278,8 +327,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude } => {
+            CliCommand::AddWithExclude { exclude, dry_run } => {
                 assert_eq!(exclude, vec!["*.txt"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -293,9 +343,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(!push);
                 assert!(args.is_empty());
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -307,9 +362,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(push);
                 assert!(args.is_empty());
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -321,9 +381,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(!push);
                 assert_eq!(args, vec!["Regular commit message"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -335,9 +400,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(!push);
                 assert_eq!(args, vec!["--amend"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -349,9 +419,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(!push);
                 assert_eq!(args, vec!["--amend", "--no-edit"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -363,9 +438,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(push);
                 assert_eq!(args, vec!["--amend", "--no-edit"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -377,9 +457,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(push);
                 assert_eq!(args, vec!["Commit message"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -393,8 +478,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Push { args } => {
+            CliCommand::Push { args, dry_run } => {
                 assert!(args.is_empty());
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -406,8 +492,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Push { args } => {
+            CliCommand::Push { args, dry_run } => {
                 assert_eq!(args, vec!["--force"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -419,8 +506,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Push { args } => {
+            CliCommand::Push { args, dry_run } => {
                 assert_eq!(args, vec!["--force", "--set-upstream", "origin", "main"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -432,8 +520,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Push { args } => {
+            CliCommand::Push { args, dry_run } => {
                 assert_eq!(args, vec!["origin", "feature/branch"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -445,8 +534,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Push { args } => {
+            CliCommand::Push { args, dry_run } => {
                 assert_eq!(args, vec!["-u", "origin", "main"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -460,7 +550,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Generate => (),
+            CliCommand::Generate { dry_run } => {
+                assert!(!dry_run);
+            }
             _ => panic!("Wrong command parsed"),
         }
     }
@@ -486,8 +578,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Initialize { editor } => {
+            CliCommand::Initialize { editor, dry_run } => {
                 assert_eq!(editor, "nano");
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -499,8 +592,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Initialize { editor } => {
+            CliCommand::Initialize { editor, dry_run } => {
                 assert_eq!(editor, "zed");
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -514,8 +608,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Set { editor } => {
+            CliCommand::Set { editor, dry_run } => {
                 assert_eq!(editor, "vim");
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -527,8 +622,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Set { editor } => {
+            CliCommand::Set { editor, dry_run } => {
                 assert_eq!(editor, "\"Visual Studio Code\"");
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -540,8 +636,9 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Set { editor } => {
+            CliCommand::Set { editor, dry_run } => {
                 assert_eq!(editor, "/usr/bin/vim");
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -578,9 +675,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(!push); // --push should be treated as git arg
                 assert_eq!(args, vec!["--amend", "--push"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -592,9 +694,14 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(!push);
                 assert_eq!(args, vec!["--push-to-upstream"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -619,9 +726,14 @@ mod cli_tests {
 
         assert!(cli.verbose);
         match cli.command {
-            CliCommand::Commit { args, push } => {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+            } => {
                 assert!(push);
                 assert_eq!(args, vec!["--amend", "--no-edit"]);
+                assert!(!dry_run);
             }
             _ => panic!("Wrong command parsed"),
         }

@@ -15,8 +15,9 @@ _rona() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" : \
-'-v[Verbose Optional '\''verbose'\'' argument. Only works if a subcommand is passed. If passed, it will print more information about the operation]' \
-'--verbose[Verbose Optional '\''verbose'\'' argument. Only works if a subcommand is passed. If passed, it will print more information about the operation]' \
+'--config=[Use custom config file path instead of default]:PATH:_default' \
+'-v[Verbose output - show detailed information about operations]' \
+'--verbose[Verbose output - show detailed information about operations]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -32,6 +33,7 @@ _rona() {
         case $line[1] in
             (add-with-exclude)
 _arguments "${_arguments_options[@]}" : \
+'--dry-run[Show what would be added without actually adding files]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '*::exclude -- Patterns of files to exclude (supports glob patterns like `"node_modules/*"`):_default' \
@@ -41,6 +43,7 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '-p[Whether to push the commit after committing]' \
 '--push[Whether to push the commit after committing]' \
+'--dry-run[Show what would be committed without actually committing]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '*::args -- Additionnal arguments to pass to the commit command:_default' \
@@ -55,12 +58,14 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (generate)
 _arguments "${_arguments_options[@]}" : \
+'--dry-run[Show what would be generated without creating files]' \
 '-h[Print help]' \
 '--help[Print help]' \
 && ret=0
 ;;
 (init)
 _arguments "${_arguments_options[@]}" : \
+'--dry-run[Show what would be initialized without creating files]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '::editor -- Editor to use for the commit message:_default' \
@@ -74,6 +79,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (push)
 _arguments "${_arguments_options[@]}" : \
+'--dry-run[Show what would be pushed without actually pushing]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '*::args -- Additionnal arguments to pass to the push command:_default' \
@@ -81,6 +87,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (set-editor)
 _arguments "${_arguments_options[@]}" : \
+'--dry-run[Show what would be changed without modifying config]' \
 '-h[Print help]' \
 '--help[Print help]' \
 ':editor -- The editor to use for the commit message:_default' \

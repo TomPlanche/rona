@@ -50,8 +50,10 @@
 pub mod cli;
 pub mod config;
 pub mod errors;
+pub mod git;
 pub mod git_related;
 pub mod my_clap_theme;
+pub mod performance;
 pub mod utils;
 
 use cli::run;

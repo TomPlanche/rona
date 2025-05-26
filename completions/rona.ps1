@@ -21,8 +21,9 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'rona' {
-            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbose Optional ''verbose'' argument. Only works if a subcommand is passed. If passed, it will print more information about the operation')
-            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbose Optional ''verbose'' argument. Only works if a subcommand is passed. If passed, it will print more information about the operation')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Use custom config file path instead of default')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbose output - show detailed information about operations')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbose output - show detailed information about operations')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
@@ -39,6 +40,7 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
             break
         }
         'rona;add-with-exclude' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be added without actually adding files')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
@@ -46,6 +48,7 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
         'rona;commit' {
             [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Whether to push the commit after committing')
             [CompletionResult]::new('--push', '--push', [CompletionResultType]::ParameterName, 'Whether to push the commit after committing')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be committed without actually committing')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
@@ -56,11 +59,13 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
             break
         }
         'rona;generate' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be generated without creating files')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
         'rona;init' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be initialized without creating files')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
@@ -71,11 +76,13 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
             break
         }
         'rona;push' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be pushed without actually pushing')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
         'rona;set-editor' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be changed without modifying config')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
