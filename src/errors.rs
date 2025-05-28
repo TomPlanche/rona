@@ -83,3 +83,33 @@ pub enum GitError {
 
 /// Type alias for Result using `RonaError`
 pub type Result<T> = std::result::Result<T, RonaError>;
+
+/// Formats and prints error messages in a clean, readable format.
+///
+/// This function takes an error message and formats it for display by:
+/// - Removing empty lines
+/// - Trimming whitespace from each line
+/// - Printing each non-empty line
+///
+/// If the error message contains only empty lines, it prints a default message
+/// indicating no additional information is available.
+///
+/// # Arguments
+///
+/// * `error_message` - A borrowed string containing the error message to format
+/// ```
+pub fn pretty_print_error(error_message: &str) {
+    println!("-------------------");
+
+    if error_message.lines().all(|line| line.trim().is_empty()) {
+        println!("No additional information provided.");
+    } else {
+        for line in error_message.lines() {
+            if !line.trim().is_empty() {
+                println!("{}", line.trim());
+            }
+        }
+    }
+
+    println!("-------------------");
+}
