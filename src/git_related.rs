@@ -35,7 +35,7 @@ use std::{
     fs::{File, OpenOptions, read_to_string, write},
     io::{self, Error, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
 };
 
 use glob::Pattern;
@@ -504,24 +504,7 @@ pub fn git_commit(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
         .args(&filtered_args)
         .output()?;
 
-    if output.status.success() {
-        if verbose {
-            println!("Commit successful!");
-        }
-
-        if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
-        }
-
-        Ok(())
-    } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-
-        println!("\n🚨 Git commit failed:");
-        pretty_print_error(&error_message);
-
-        Err(RonaError::Io(Error::other("Git commit failed")))
-    }
+    handle_output("commit", &output, verbose)
 }
 
 /// Retrieves the top-level path of the git repository.
@@ -591,24 +574,7 @@ pub fn git_push(args: &Vec<String>, verbose: bool, dry_run: bool) -> Result<()> 
 
     let output = Command::new("git").arg("push").args(args).output()?;
 
-    if output.status.success() {
-        if verbose {
-            println!("Push successful.");
-        }
-
-        if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
-        }
-
-        Ok(())
-    } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-
-        println!("\n 🚨 Git push failed");
-        pretty_print_error(&error_message);
-
-        Err(RonaError::Io(Error::other("Git push failed")))
-    }
+    handle_output("push", &output, verbose)
 }
 
 /// Prepares the commit message.
@@ -850,6 +816,44 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
         }
     }
     Ok(result)
+}
+
+/// Handles the output of git commands, providing consistent error handling and success messaging.
+///
+/// This function processes the output of git commands and:
+/// - Prints success messages when verbose mode is enabled
+/// - Displays command output if present
+/// - Formats and prints error messages with suggestions when commands fail
+///
+/// # Arguments
+/// * `method_name` - The name of the git command being executed (e.g., "commit", "push")
+/// * `output` - The `Output` struct containing the command's stdout, stderr, and status
+/// * `verbose` - Whether to print verbose output during the operation
+///
+/// # Returns
+/// * `Result<()>` - `Ok(())` if the command succeeded, `Err(RonaError)` if it failed
+/// ```
+fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()> {
+    if output.status.success() {
+        if verbose {
+            println!("{method_name} successful!");
+        }
+
+        if !output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
+        }
+
+        Ok(())
+    } else {
+        let error_message = String::from_utf8_lossy(&output.stderr);
+
+        println!("\n🚨 Git {method_name} failed:");
+        pretty_print_error(&error_message);
+
+        Err(RonaError::Io(Error::other(format!(
+            "Git {method_name} failed"
+        ))))
+    }
 }
 
 #[cfg(test)]
