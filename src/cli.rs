@@ -34,7 +34,7 @@ use crate::{
     },
     my_clap_theme,
 };
-use clap::{Command as ClapCommand, CommandFactory, Parser, Subcommand, command};
+use clap::{Command as ClapCommand, CommandFactory, Parser, Subcommand, ValueHint, command};
 use clap_complete::{Shell, generate};
 use dialoguer::Select;
 use glob::Pattern;
@@ -47,8 +47,8 @@ pub(crate) enum CliCommand {
     #[command(short_flag = 'a', name = "add-with-exclude")]
     AddWithExclude {
         /// Patterns of files to exclude (supports glob patterns like `"node_modules/*"`)
-        #[arg(value_name = "PATTERNS")]
-        exclude: Vec<String>,
+        #[arg(value_name = "PATTERNS", value_hint = ValueHint::AnyPath)]
+        to_exclude: Vec<String>,
 
         /// Show what would be added without actually adding files
         #[arg(long, default_value_t = false)]
@@ -66,7 +66,7 @@ pub(crate) enum CliCommand {
         #[arg(long, default_value_t = false)]
         dry_run: bool,
 
-        /// Additionnal arguments to pass to the commit command
+        /// Additional arguments to pass to the commit command
         #[arg(allow_hyphen_values = true)]
         args: Vec<String>,
     },
@@ -187,7 +187,10 @@ pub fn run() -> Result<()> {
     let config = Config::new()?;
 
     match cli.command {
-        CliCommand::AddWithExclude { exclude, dry_run } => {
+        CliCommand::AddWithExclude {
+            to_exclude: exclude,
+            dry_run,
+        } => {
             let patterns: Vec<Pattern> = exclude
                 .iter()
                 .map(|p| Pattern::new(p).expect("Invalid glob pattern"))
@@ -213,14 +216,6 @@ pub fn run() -> Result<()> {
             // Add custom completions for fish shell
             if matches!(shell, Shell::Fish) {
                 print_fish_custom_completions();
-            }
-        }
-        CliCommand::ListStatus => {
-            let files = get_status_files()?;
-
-            // Print each file on a new line for fish shell completion
-            for file in files {
-                println!("{file}");
             }
         }
         CliCommand::Generate { dry_run } => {
@@ -257,6 +252,14 @@ pub fn run() -> Result<()> {
             }
             config.create_config_file(&editor)?;
         }
+        CliCommand::ListStatus => {
+            let files = get_status_files()?;
+
+            // Print each file on a new line for fish shell completion
+            for file in files {
+                println!("{file}");
+            }
+        }
         CliCommand::Push { args, dry_run } => {
             git_push(&args, cli.verbose, dry_run)?;
         }
@@ -285,7 +288,10 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude, dry_run } => {
+            CliCommand::AddWithExclude {
+                to_exclude: exclude,
+                dry_run,
+            } => {
                 assert!(exclude.is_empty());
                 assert!(!dry_run);
             }
@@ -299,7 +305,10 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude, dry_run } => {
+            CliCommand::AddWithExclude {
+                to_exclude: exclude,
+                dry_run,
+            } => {
                 assert_eq!(exclude, vec!["*.txt"]);
                 assert!(!dry_run);
             }
@@ -313,7 +322,10 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude, dry_run } => {
+            CliCommand::AddWithExclude {
+                to_exclude: exclude,
+                dry_run,
+            } => {
                 assert_eq!(exclude, vec!["*.txt", "*.log", "target/*"]);
                 assert!(!dry_run);
             }
@@ -327,7 +339,10 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::AddWithExclude { exclude, dry_run } => {
+            CliCommand::AddWithExclude {
+                to_exclude: exclude,
+                dry_run,
+            } => {
                 assert_eq!(exclude, vec!["*.txt"]);
                 assert!(!dry_run);
             }

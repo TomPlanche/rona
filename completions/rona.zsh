@@ -36,7 +36,7 @@ _arguments "${_arguments_options[@]}" : \
 '--dry-run[Show what would be added without actually adding files]' \
 '-h[Print help]' \
 '--help[Print help]' \
-'*::exclude -- Patterns of files to exclude (supports glob patterns like `"node_modules/*"`):_default' \
+'*::to_exclude -- Patterns of files to exclude (supports glob patterns like `"node_modules/*"`):_files' \
 && ret=0
 ;;
 (commit)
@@ -46,7 +46,7 @@ _arguments "${_arguments_options[@]}" : \
 '--dry-run[Show what would be committed without actually committing]' \
 '-h[Print help]' \
 '--help[Print help]' \
-'*::args -- Additionnal arguments to pass to the commit command:_default' \
+'*::args -- Additional arguments to pass to the commit command:_default' \
 && ret=0
 ;;
 (completion)
