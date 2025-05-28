@@ -43,6 +43,7 @@ use regex::Regex;
 
 use crate::{
     errors::{GitError, Result, RonaError, pretty_print_error},
+    git::find_git_root,
     print_error,
     utils::{check_for_file_in_folder, find_project_root},
 };
@@ -147,34 +148,6 @@ pub fn create_needed_files() -> Result<()> {
     add_to_git_exclude(&[COMMIT_MESSAGE_FILE_PATH, COMMITIGNORE_FILE_PATH])?;
 
     Ok(())
-}
-
-/// Finds the root directory of the git repository by traversing up the directory tree
-/// until it finds a .git directory or file.
-///
-/// # Errors
-/// - If not in a git repository
-/// - If unable to access directories
-///
-/// # Returns
-/// - `Ok(PathBuf)` - Path to the git repository root
-/// - `Err(GitError)` - If not in a git repository or other errors occur
-pub fn find_git_root() -> Result<PathBuf> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .output()?;
-
-    if output.status.success() {
-        let git_root = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
-
-        if git_root.exists() {
-            Ok(git_root)
-        } else {
-            Err(RonaError::Git(GitError::RepositoryNotFound))
-        }
-    } else {
-        Err(RonaError::Git(GitError::RepositoryNotFound))
-    }
 }
 
 /// Formats the branch name.
@@ -884,6 +857,8 @@ mod tests {
     use std::fs;
 
     use tempfile::Builder;
+
+    use crate::git::find_git_root;
 
     use super::*;
 
