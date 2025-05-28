@@ -491,9 +491,11 @@ pub fn git_commit(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
         println!("---");
         println!("{}", file_content.trim());
         println!("---");
+
         if !filtered_args.is_empty() {
             println!("With additional args: {filtered_args:?}");
         }
+
         return Ok(());
     }
 
@@ -520,11 +522,16 @@ pub fn git_commit(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
         println!("\n🚨 Git commit failed:");
         println!("-------------------");
 
-        for line in error_message.lines() {
-            if !line.trim().is_empty() {
-                println!("{}", line.trim());
+        if error_message.lines().all(|line| line.trim().is_empty()) {
+            println!("No additional information provided.");
+        } else {
+            for line in error_message.lines() {
+                if !line.trim().is_empty() {
+                    println!("{}", line.trim());
+                }
             }
         }
+        println!("-------------------");
 
         Err(RonaError::Io(Error::other("Git commit failed")))
     }
@@ -613,13 +620,18 @@ pub fn git_push(args: &Vec<String>, verbose: bool, dry_run: bool) -> Result<()> 
         println!("\n 🚨 Git push failed");
         println!("-------------------");
 
-        for line in error_message.lines() {
-            if !line.trim().is_empty() {
-                println!("{}", line.trim());
+        if error_message.lines().all(|line| line.trim().is_empty()) {
+            println!("No additional information provided.");
+        } else {
+            for line in error_message.lines() {
+                if !line.trim().is_empty() {
+                    println!("{}", line.trim());
+                }
             }
         }
+        println!("-------------------");
 
-        Err(RonaError::Io(Error::other("Git commit failed")))
+        Err(RonaError::Io(Error::other("Git push failed")))
     }
 }
 

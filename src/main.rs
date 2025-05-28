@@ -63,7 +63,7 @@ use utils::print_error;
 
 fn main() {
     if let Err(e) = inner_main() {
-        println!("Rona error:\n{e}");
+        eprintln!("{e}");
 
         exit(1);
     }

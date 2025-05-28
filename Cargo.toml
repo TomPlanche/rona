@@ -7,7 +7,7 @@ keywords = ["cli", "git", "helper", "commands"]
 license = "Apache-2.0 OR MIT"
 name = "rona"
 repository = "https://github.com/tomplanche/rona"
-version = "2.4.3"
+version = "2.4.4"
 include = [
     "/Cargo.toml",
     "/LICENSE-APACHE",
@@ -22,8 +22,8 @@ name = "rona"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5.37", features = ["derive"] }
-clap_complete = "4.5.50"
+clap = { version = "4.5.39", features = ["derive"] }
+clap_complete = "4.5.51"
 console = "0.15.11"
 dialoguer = "0.11.0"
 glob = "0.3.2"
@@ -31,7 +31,9 @@ regex = "1.11.1"
 thiserror = "2.0.12"
 
 [dev-dependencies]
-tempfile = "3.19.1"
+assert_cmd = "2.0.17"
+mockall = "0.13.1"
+tempfile = "3.20.0"
 
 [build-dependencies]
-hooksmith = "1.7.2"
+hooksmith = "1.11.0"
