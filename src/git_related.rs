@@ -9,19 +9,20 @@
 //! - File staging with pattern exclusion
 //! - Repository status tracking
 //! - Git configuration management
+//! - Deleted file processing for different contexts
 //!
 //! ## Examples
 //!
 //! ```rust
-//! use rona::git_related::{generate_commit_message, add_with_exclude};
+//! use rona::git_related::{generate_commit_message, git_add_with_exclude_patterns};
 //!
 //! // Generate a commit message
 //! let commit_type = "feat";
-//! let message = generate_commit_message(commit_type)?;
+//! let message = generate_commit_message(commit_type, false)?;
 //!
 //! // Add files while excluding patterns
-//! let patterns = vec!["*.rs", "*.tmp"];
-//! add_with_exclude(&patterns)?;
+//! let patterns = vec![];
+//! git_add_with_exclude_patterns(&patterns, false, false)?;
 //! ```
 //!
 //! ## Error Handling
@@ -332,7 +333,7 @@ pub fn git_add_with_exclude_patterns(
     }
 
     let git_status = read_git_status()?;
-    let deleted_files = process_deleted_files(&git_status)?;
+    let deleted_files = process_deleted_files_for_staging(&git_status)?;
     let deleted_files_count = deleted_files.len();
 
     let staged_files = get_status_files()?;
@@ -601,7 +602,7 @@ pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
     // Get git status info
     let git_status = read_git_status()?;
     let modified_files = process_git_status(&git_status)?;
-    let deleted_files = process_deleted_files(&git_status)?;
+    let deleted_files = process_deleted_files_for_commit_message(&git_status)?;
 
     // Open the commit file for writing
     let mut commit_file = OpenOptions::new()
@@ -708,7 +709,8 @@ fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
     Ok(false)
 }
 
-/// Processes the deleted files from git status output.
+/// Processes deleted files that need to be staged for deletion.
+/// Only returns files that are deleted in working directory but not yet staged.
 ///
 /// # Arguments
 /// * `message` - The git status output string
@@ -717,8 +719,8 @@ fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
 /// * If the extracted filenames cannot be parsed
 ///
 /// # Returns
-/// * `Result<Vec<String>, String>` - The deleted files or an error message
-pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
+/// * `Result<Vec<String>>` - Files that need to be staged for deletion
+pub fn process_deleted_files_for_staging(message: &str) -> Result<Vec<String>> {
     // Regex to match files deleted in working directory but not yet staged for deletion
     // Git status format: XY filename
     // Where X = index status, Y = working tree status
@@ -731,6 +733,46 @@ pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
     // - "D  file.txt" (already staged for deletion)
     // - "DD file.txt" (deleted in both index and working tree - already staged)
     extract_filenames(message, r"^[^D]D\s+(.+)$")
+}
+
+/// Processes deleted files for commit message generation.
+/// Returns all deleted files regardless of staging status.
+///
+/// # Arguments
+/// * `message` - The git status output string
+///
+/// # Errors
+/// * If the extracted filenames cannot be parsed
+///
+/// # Returns
+/// * `Result<Vec<String>>` - All deleted files for commit message
+pub fn process_deleted_files_for_commit_message(message: &str) -> Result<Vec<String>> {
+    // Regex to match all deleted files in git status output
+    // This includes both staged and unstaged deletions:
+    // - " D file.txt" (deleted in working tree only)
+    // - "D  file.txt" (staged for deletion)
+    // - "MD file.txt" (modified in index, deleted in working tree)
+    // - "AD file.txt" (added in index, deleted in working tree)
+    // - "DD file.txt" (deleted in both index and working tree)
+    extract_filenames(message, r"^[DAM ][D ]\s+(.+)$")
+}
+
+/// Processes the deleted files from git status output.
+///
+/// # Deprecated
+/// Use `process_deleted_files_for_staging` or `process_deleted_files_for_commit_message` instead.
+///
+/// # Arguments
+/// * `message` - The git status output string
+///
+/// # Errors
+/// * If the extracted filenames cannot be parsed
+///
+/// # Returns
+/// * `Result<Vec<String>, String>` - The deleted files or an error message
+pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
+    // For backward compatibility, use the staging behavior
+    process_deleted_files_for_staging(message)
 }
 
 /// Processes the git status.
@@ -906,7 +948,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_deteted_files() {
+    fn test_process_deleted_files_for_staging() {
         let lines: Vec<&str> = vec![
             " D src/git_related.rs", // Deleted in working tree only - should be included
             "D  src/main.rs",        // Already staged for deletion - should be excluded
@@ -919,10 +961,39 @@ mod tests {
             "C  src/bly.rs",         // Copied - not relevant
             "U  src/pae.rs",         // Updated but unmerged - not relevant
         ];
-        let deleted_files = process_deleted_files(lines.join("\n").as_str()).unwrap();
+        let deleted_files = process_deleted_files_for_staging(lines.join("\n").as_str()).unwrap();
 
         // Only files that are deleted in working tree but not yet staged should be included
         assert_eq!(deleted_files, vec!["src/git_related.rs", "src/utils.rs"]);
+    }
+
+    #[test]
+    fn test_process_deleted_files_for_commit_message() {
+        let lines: Vec<&str> = vec![
+            " D src/git_related.rs", // Deleted in working tree only - should be included
+            "D  src/main.rs",        // Already staged for deletion - should be included
+            "AD src/utils.rs",       // Added in index, deleted in working tree - should be included
+            "?? src/README.md",      // Untracked - not relevant
+            "UU src/bla.rs",         // Unmerged - not relevant
+            "!! src/bli.rs",         // Ignored - not relevant
+            "DD src/blo.rs",         // Deleted in both index and working tree - should be included
+            "R  src/blu.rs",         // Renamed - not relevant
+            "C  src/bly.rs",         // Copied - not relevant
+            "U  src/pae.rs",         // Updated but unmerged - not relevant
+        ];
+        let deleted_files =
+            process_deleted_files_for_commit_message(lines.join("\n").as_str()).unwrap();
+
+        // All deleted files should be included for commit message
+        assert_eq!(
+            deleted_files,
+            vec![
+                "src/git_related.rs",
+                "src/main.rs",
+                "src/utils.rs",
+                "src/blo.rs"
+            ]
+        );
     }
 
     #[test]
