@@ -10,5 +10,7 @@ pre-commit:
         - git add completions/rona*
 pre-push:
     commands:
+        - cargo install cargo-audit && cargo audit
+        - cargo install cargo-outdated && cargo outdated
         - cargo build -q
         - cargo test -q
