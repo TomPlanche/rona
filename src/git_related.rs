@@ -719,11 +719,18 @@ fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
 /// # Returns
 /// * `Result<Vec<String>, String>` - The deleted files or an error message
 pub fn process_deleted_files(message: &str) -> Result<Vec<String>> {
-    // Regex to match deleted files in git status output
-    extract_filenames(
-        message,
-        r"^(?:|(?:\sD)|(?:[A-Z]D))\s{1,}([A-Za-z0-9\/_\-\.]*)$",
-    )
+    // Regex to match files deleted in working directory but not yet staged for deletion
+    // Git status format: XY filename
+    // Where X = index status, Y = working tree status
+    // We want files where Y = 'D' (deleted in working tree) but X ≠ 'D'
+    // This includes:
+    // - " D file.txt" (not in index, deleted in working tree)
+    // - "MD file.txt" (modified in index, deleted in working tree)
+    // - "AD file.txt" (added in index, deleted in working tree)
+    // But excludes:
+    // - "D  file.txt" (already staged for deletion)
+    // - "DD file.txt" (deleted in both index and working tree - already staged)
+    extract_filenames(message, r"^[^D]D\s+(.+)$")
 }
 
 /// Processes the git status.
@@ -815,6 +822,7 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
             }
         }
     }
+
     Ok(result)
 }
 
@@ -900,23 +908,21 @@ mod tests {
     #[test]
     fn test_process_deteted_files() {
         let lines: Vec<&str> = vec![
-            " D src/git_related.rs",
-            "D  src/main.rs",
-            "AD src/utils.rs",
-            "?? src/README.md",
-            "UU src/bla.rs",
-            "!! src/bli.rs",
-            "DD src/blo.rs",
-            "R  src/blu.rs",
-            "C  src/bly.rs",
-            "U  src/pae.rs",
+            " D src/git_related.rs", // Deleted in working tree only - should be included
+            "D  src/main.rs",        // Already staged for deletion - should be excluded
+            "AD src/utils.rs",       // Added in index, deleted in working tree - should be included
+            "?? src/README.md",      // Untracked - not relevant
+            "UU src/bla.rs",         // Unmerged - not relevant
+            "!! src/bli.rs",         // Ignored - not relevant
+            "DD src/blo.rs",         // Deleted in both index and working tree - should be excluded
+            "R  src/blu.rs",         // Renamed - not relevant
+            "C  src/bly.rs",         // Copied - not relevant
+            "U  src/pae.rs",         // Updated but unmerged - not relevant
         ];
         let deleted_files = process_deleted_files(lines.join("\n").as_str()).unwrap();
 
-        assert_eq!(
-            deleted_files,
-            vec!["src/git_related.rs", "src/utils.rs", "src/blo.rs"]
-        );
+        // Only files that are deleted in working tree but not yet staged should be included
+        assert_eq!(deleted_files, vec!["src/git_related.rs", "src/utils.rs"]);
     }
 
     #[test]
