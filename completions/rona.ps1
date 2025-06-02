@@ -21,7 +21,7 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'rona' {
-            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Use custom config file path instead of default')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Use the custom config file path instead of default')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbose output - show detailed information about operations')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbose output - show detailed information about operations')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
@@ -60,6 +60,8 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
         }
         'rona;generate' {
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be generated without creating files')
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Interactive mode - input the commit message directly in the terminal')
+            [CompletionResult]::new('--interactive', '--interactive', [CompletionResultType]::ParameterName, 'Interactive mode - input the commit message directly in the terminal')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break

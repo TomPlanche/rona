@@ -25,7 +25,7 @@
 //! rona -g
 //!
 //! # Commit and push changes
-//! rona -cp
+//! rona -c -p
 //! ```
 //!
 //! For more detailed examples and usage instructions, see the [README.md](../README.md) file.

@@ -18,7 +18,7 @@ set edit:completion:arg-completer[rona] = {|@words|
     }
     var completions = [
         &'rona'= {
-            cand --config 'Use custom config file path instead of default'
+            cand --config 'Use the custom config file path instead of default'
             cand -v 'Verbose output - show detailed information about operations'
             cand --verbose 'Verbose output - show detailed information about operations'
             cand -h 'Print help'
@@ -53,6 +53,8 @@ set edit:completion:arg-completer[rona] = {|@words|
         }
         &'rona;generate'= {
             cand --dry-run 'Show what would be generated without creating files'
+            cand -i 'Interactive mode - input the commit message directly in the terminal'
+            cand --interactive 'Interactive mode - input the commit message directly in the terminal'
             cand -h 'Print help'
             cand --help 'Print help'
         }

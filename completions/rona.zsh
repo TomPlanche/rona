@@ -15,7 +15,7 @@ _rona() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" : \
-'--config=[Use custom config file path instead of default]:PATH:_default' \
+'--config=[Use the custom config file path instead of default]:PATH:_default' \
 '-v[Verbose output - show detailed information about operations]' \
 '--verbose[Verbose output - show detailed information about operations]' \
 '-h[Print help]' \
@@ -59,6 +59,8 @@ _arguments "${_arguments_options[@]}" : \
 (generate)
 _arguments "${_arguments_options[@]}" : \
 '--dry-run[Show what would be generated without creating files]' \
+'-i[Interactive mode - input the commit message directly in the terminal]' \
+'--interactive[Interactive mode - input the commit message directly in the terminal]' \
 '-h[Print help]' \
 '--help[Print help]' \
 && ret=0

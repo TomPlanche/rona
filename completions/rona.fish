@@ -24,7 +24,7 @@ function __fish_rona_using_subcommand
 	contains -- $cmd[1] $argv
 end
 
-complete -c rona -n "__fish_rona_needs_command" -l config -d 'Use custom config file path instead of default' -r
+complete -c rona -n "__fish_rona_needs_command" -l config -d 'Use the custom config file path instead of default' -r
 complete -c rona -n "__fish_rona_needs_command" -s v -l verbose -d 'Verbose output - show detailed information about operations'
 complete -c rona -n "__fish_rona_needs_command" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_needs_command" -s V -l version -d 'Print version'
@@ -44,6 +44,7 @@ complete -c rona -n "__fish_rona_using_subcommand commit" -l dry-run -d 'Show wh
 complete -c rona -n "__fish_rona_using_subcommand commit" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand completion" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand generate" -l dry-run -d 'Show what would be generated without creating files'
+complete -c rona -n "__fish_rona_using_subcommand generate" -s i -l interactive -d 'Interactive mode - input the commit message directly in the terminal'
 complete -c rona -n "__fish_rona_using_subcommand generate" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand init" -l dry-run -d 'Show what would be initialized without creating files'
 complete -c rona -n "__fish_rona_using_subcommand init" -s h -l help -d 'Print help'

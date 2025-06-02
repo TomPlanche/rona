@@ -137,7 +137,7 @@ _rona() {
             return 0
             ;;
         rona__generate)
-            opts="-h --dry-run --help"
+            opts="-i -h --dry-run --interactive --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

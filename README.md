@@ -65,13 +65,16 @@ rona -a "test_*.rs" "*.test.js"
 
 3. Generate and edit commit message:
 ```bash
-# Generate commit message template
+# Generate commit message template (opens editor)
 rona -g
+
+# Interactive mode (input directly in terminal)
+rona -g -i
 
 # This will:
 # 1. Open an interactive commit type selector
 # 2. Create/update commit_message.md
-# 3. Open your configured editor to edit the message
+# 3. Either open your configured editor (default) or prompt for simple input (-i)
 ```
 
 4. Commit and push changes:
@@ -80,13 +83,13 @@ rona -g
 rona -c
 
 # Commit and push in one command
-rona -cp
+rona -c -p
 
 # Commit with additional Git arguments
 rona -c --no-verify
 
 # Commit and push with specific branch
-rona -cp origin main
+rona -c -p origin main
 ```
 
 ### Advanced Usage
@@ -98,7 +101,7 @@ rona -cp origin main
 git checkout -b feature/new-feature
 rona -a "*.rs"
 rona -g
-rona -cp
+rona -c -p
 
 # Switch back to main and merge
 git checkout main
@@ -125,7 +128,7 @@ rona -a "*" -e "*.log" "*.tmp"
 rona init
 rona -a "*"
 rona -g
-rona -cp --no-verify
+rona -c -p --no-verify
 ```
 
 #### Shell Integration
@@ -148,7 +151,7 @@ echo 'alias rona="command rona"' >> ~/.bashrc
 git checkout -b feature/new-feature
 rona -a "src/" "tests/"
 rona -g  # Select 'feat' type
-rona -cp
+rona -c -p
 ```
 
 2. **Bug Fixes**:
@@ -157,7 +160,7 @@ rona -cp
 git checkout -b fix/bug-description
 rona -a "src/"
 rona -g  # Select 'fix' type
-rona -cp
+rona -c -p
 ```
 
 3. **Code Cleanup**:
@@ -166,7 +169,7 @@ rona -cp
 git checkout -b chore/cleanup
 rona -a "src/" -e "*.rs"
 rona -g  # Select 'chore' type
-rona -cp
+rona -c -p
 ```
 
 4. **Testing**:
@@ -175,7 +178,15 @@ rona -cp
 git checkout -b test/add-tests
 rona -a "tests/"
 rona -g  # Select 'test' type
-rona -cp
+rona -c -p
+```
+
+5. **Quick Commits (Interactive Mode)**:
+```bash
+# Fast workflow without opening editor
+rona -a "src/"
+rona -g -i  # Select type and input message directly
+rona -c -p
 ```
 
 ## Command Reference
@@ -221,16 +232,36 @@ rona completion fish > ~/.config/fish/completions/rona.fish
 Generate or update commit message template.
 
 ```bash
-rona generate
+rona generate [--interactive]
 # or
-rona -g
+rona -g [-i | --interactive]
 ```
 
 **Features:**
 - Creates `commit_message.md` and `.commitignore`
 - Interactive commit type selection
 - Automatic file change tracking
-- Opens in default editor (set via EDITOR env variable)
+- **Interactive mode:** Input commit message directly in terminal (`-i` flag)
+- **Editor mode:** Opens in configured editor (default behavior)
+
+**Examples:**
+
+```bash
+# Standard mode: Opens commit type selector, then editor
+rona -g
+
+# Interactive mode: Input message directly in terminal
+rona -g -i
+```
+
+**Interactive Mode Usage:**
+When using the `-i` flag, Rona will:
+1. Show the commit type selector (chore, feat, fix, test)
+2. Prompt for a single commit message input
+3. Generate a clean format: `[commit_nb] (type on branch) message`
+4. Save directly to `commit_message.md` without file details
+
+This is perfect for quick, clean commits without the detailed file listing.
 
 ### `init` (`-i`)
 Initialize Rona configuration.

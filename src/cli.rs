@@ -85,6 +85,10 @@ pub(crate) enum CliCommand {
         /// Show what would be generated without creating files
         #[arg(long, default_value_t = false)]
         dry_run: bool,
+
+        /// Interactive mode - input the commit message directly in the terminal
+        #[arg(short = 'i', long = "interactive", default_value_t = false)]
+        interactive: bool,
     },
 
     /// Initialize the rona configuration file.
@@ -148,7 +152,7 @@ pub(crate) struct Cli {
     #[arg(short, long, default_value = "false")]
     verbose: bool,
 
-    /// Use custom config file path instead of default
+    /// Use the custom config file path instead of default
     #[arg(long, value_name = "PATH")]
     config: Option<String>,
 }
@@ -181,9 +185,9 @@ fn print_fish_custom_completions() {
 ///
 /// # Errors
 /// * Return an error if the command fails.
+#[allow(clippy::too_many_lines)]
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-
     let config = Config::new()?;
 
     match cli.command {
@@ -218,7 +222,10 @@ pub fn run() -> Result<()> {
                 print_fish_custom_completions();
             }
         }
-        CliCommand::Generate { dry_run } => {
+        CliCommand::Generate {
+            dry_run,
+            interactive,
+        } => {
             if dry_run {
                 println!("Would create files: commit_message.md, .commitignore");
                 println!("Would add files to .git/info/exclude");
@@ -236,14 +243,61 @@ pub fn run() -> Result<()> {
 
             generate_commit_message(commit_type, cli.verbose)?;
 
-            let editor = config.get_editor()?;
+            if interactive {
+                // Interactive mode: let the user input the commit message directly in the terminal
+                use dialoguer::Input;
+                use std::fs;
 
-            Command::new(editor)
-                .arg(COMMIT_MESSAGE_FILE_PATH)
-                .spawn()
-                .expect("Failed to spawn editor")
-                .wait()
-                .expect("Failed to wait for editor");
+                println!("\n📝 Interactive mode: Enter your commit message.");
+                println!("💡 Tip: Keep it concise and descriptive.");
+
+                let message: String = Input::with_theme(&my_clap_theme::ColorfulTheme::default())
+                    .with_prompt("Message")
+                    .interact()
+                    .unwrap();
+
+                if message.trim().is_empty() {
+                    println!("⚠️  Empty message provided. Exiting.");
+                    return Ok(());
+                }
+
+                // Generate simple commit message format: [commit_nb] (type on branch) message
+                let commit_number = crate::git_related::get_current_commit_nb()? + 1;
+                let branch_name = crate::git_related::format_branch_name(
+                    &COMMIT_TYPES,
+                    &crate::git_related::get_current_branch()?,
+                );
+
+                let formatted_message = format!(
+                    "[{}] ({} on {}) {}",
+                    commit_number,
+                    commit_type,
+                    branch_name,
+                    message.trim()
+                );
+
+                // Write the simple formatted message to commit_message.md
+                fs::write(COMMIT_MESSAGE_FILE_PATH, formatted_message)?;
+
+                println!("\n✅ Commit message created!");
+                println!(
+                    "📄 Message: [{}] ({} on {}) {}",
+                    commit_number,
+                    commit_type,
+                    branch_name,
+                    message.trim()
+                );
+            } else {
+                // Original behavior: open editor
+                let editor = config.get_editor()?;
+
+                Command::new(editor)
+                    .arg(COMMIT_MESSAGE_FILE_PATH)
+                    .spawn()
+                    .expect("Failed to spawn editor")
+                    .wait()
+                    .expect("Failed to wait for editor");
+            }
         }
         CliCommand::Initialize { editor, dry_run } => {
             if dry_run {
@@ -254,7 +308,6 @@ pub fn run() -> Result<()> {
         }
         CliCommand::ListStatus => {
             let files = get_status_files()?;
-
             // Print each file on a new line for fish shell completion
             for file in files {
                 println!("{file}");
@@ -565,8 +618,46 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            CliCommand::Generate { dry_run } => {
+            CliCommand::Generate {
+                dry_run,
+                interactive,
+            } => {
                 assert!(!dry_run);
+                assert!(!interactive);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_generate_interactive_command() {
+        let args = vec!["rona", "-g", "-i"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Generate {
+                dry_run,
+                interactive,
+            } => {
+                assert!(!dry_run);
+                assert!(interactive);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_generate_interactive_long_form() {
+        let args = vec!["rona", "-g", "--interactive"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Generate {
+                dry_run,
+                interactive,
+            } => {
+                assert!(!dry_run);
+                assert!(interactive);
             }
             _ => panic!("Wrong command parsed"),
         }
