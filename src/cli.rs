@@ -178,6 +178,160 @@ fn print_fish_custom_completions() {
     );
 }
 
+/// Handle the `AddWithExclude` command
+fn handle_add_with_exclude(exclude: &[String], dry_run: bool, verbose: bool) -> Result<()> {
+    let patterns: Vec<Pattern> = exclude
+        .iter()
+        .map(|p| Pattern::new(p).expect("Invalid glob pattern"))
+        .collect();
+
+    git_add_with_exclude_patterns(&patterns, verbose, dry_run)?;
+    Ok(())
+}
+
+/// Handle the Commit command
+fn handle_commit(args: &[String], push: bool, dry_run: bool, verbose: bool) -> Result<()> {
+    git_commit(args, verbose, dry_run)?;
+
+    if push {
+        git_push(args, verbose, dry_run)?;
+    }
+    Ok(())
+}
+
+/// Handle the Completion command
+fn handle_completion(shell: Shell) {
+    let mut cmd = build_cli();
+    generate(shell, &mut cmd, "rona", &mut io::stdout());
+
+    // Add custom completions for fish shell
+    if matches!(shell, Shell::Fish) {
+        print_fish_custom_completions();
+    }
+}
+
+/// Handle the Generate command
+fn handle_generate(dry_run: bool, interactive: bool, verbose: bool, config: &Config) -> Result<()> {
+    if dry_run {
+        println!("Would create files: commit_message.md, .commitignore");
+        println!("Would add files to .git/info/exclude");
+        return Ok(());
+    }
+
+    create_needed_files()?;
+
+    let commit_type = COMMIT_TYPES[Select::with_theme(&my_clap_theme::ColorfulTheme::default())
+        .default(0)
+        .items(&COMMIT_TYPES)
+        .interact()
+        .unwrap()];
+
+    generate_commit_message(commit_type, verbose)?;
+
+    if interactive {
+        handle_interactive_mode(commit_type)?;
+    } else {
+        handle_editor_mode(config)?;
+    }
+    Ok(())
+}
+
+/// Handle interactive mode for generate command
+fn handle_interactive_mode(commit_type: &str) -> Result<()> {
+    use dialoguer::Input;
+    use std::fs;
+
+    println!("\n📝 Interactive mode: Enter your commit message.");
+    println!("💡 Tip: Keep it concise and descriptive.");
+
+    let message: String = Input::with_theme(&my_clap_theme::ColorfulTheme::default())
+        .with_prompt("Message")
+        .interact()
+        .unwrap();
+
+    if message.trim().is_empty() {
+        println!("⚠️  Empty message provided. Exiting.");
+        return Ok(());
+    }
+
+    // Generate a simple commit message format: [commit_nb] (type on branch) message
+    let commit_number = crate::git_related::get_current_commit_nb()? + 1;
+    let branch_name = crate::git_related::format_branch_name(
+        &COMMIT_TYPES,
+        &crate::git_related::get_current_branch()?,
+    );
+
+    let formatted_message = format!(
+        "[{}] ({} on {}) {}",
+        commit_number,
+        commit_type,
+        branch_name,
+        message.trim()
+    );
+
+    // Write the simple formatted message to commit_message.md
+    fs::write(COMMIT_MESSAGE_FILE_PATH, formatted_message)?;
+
+    println!("\n✅ Commit message created!");
+    println!(
+        "📄 Message: [{}] ({} on {}) {}",
+        commit_number,
+        commit_type,
+        branch_name,
+        message.trim()
+    );
+    Ok(())
+}
+
+/// Handle editor mode for generate command
+fn handle_editor_mode(config: &Config) -> Result<()> {
+    let editor = config.get_editor()?;
+
+    Command::new(editor)
+        .arg(COMMIT_MESSAGE_FILE_PATH)
+        .spawn()
+        .expect("Failed to spawn editor")
+        .wait()
+        .expect("Failed to wait for editor");
+    Ok(())
+}
+
+/// Handle the Initialize command
+fn handle_initialize(editor: &str, dry_run: bool, config: &Config) -> Result<()> {
+    if dry_run {
+        println!("Would create config file with editor: {editor}");
+        return Ok(());
+    }
+    config.create_config_file(editor)?;
+    Ok(())
+}
+
+/// Handle the `ListStatus` command
+fn handle_list_status() -> Result<()> {
+    let files = get_status_files()?;
+    // Print each file on a new line for fish shell completion
+    for file in files {
+        println!("{file}");
+    }
+    Ok(())
+}
+
+/// Handle the Push command
+fn handle_push(args: &[String], dry_run: bool, verbose: bool) -> Result<()> {
+    git_push(args, verbose, dry_run)?;
+    Ok(())
+}
+
+/// Handle the Set command
+fn handle_set(editor: &str, dry_run: bool, config: &Config) -> Result<()> {
+    if dry_run {
+        println!("Would set editor to: {editor}");
+        return Ok(());
+    }
+    config.set_editor(editor)?;
+    Ok(())
+}
+
 /// Runs the program.
 ///
 /// # Panics
@@ -185,7 +339,6 @@ fn print_fish_custom_completions() {
 ///
 /// # Errors
 /// * Return an error if the command fails.
-#[allow(clippy::too_many_lines)]
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     let config = Config::new()?;
@@ -194,138 +347,32 @@ pub fn run() -> Result<()> {
         CliCommand::AddWithExclude {
             to_exclude: exclude,
             dry_run,
-        } => {
-            let patterns: Vec<Pattern> = exclude
-                .iter()
-                .map(|p| Pattern::new(p).expect("Invalid glob pattern"))
-                .collect();
+        } => handle_add_with_exclude(&exclude, dry_run, cli.verbose),
 
-            git_add_with_exclude_patterns(&patterns, cli.verbose, dry_run)?;
-        }
         CliCommand::Commit {
             args,
             push,
             dry_run,
-        } => {
-            git_commit(&args, cli.verbose, dry_run)?;
+        } => handle_commit(&args, push, dry_run, cli.verbose),
 
-            if push {
-                git_push(&args, cli.verbose, dry_run)?;
-            }
-        }
         CliCommand::Completion { shell } => {
-            let mut cmd = build_cli();
-            generate(shell, &mut cmd, "rona", &mut io::stdout());
-
-            // Add custom completions for fish shell
-            if matches!(shell, Shell::Fish) {
-                print_fish_custom_completions();
-            }
+            handle_completion(shell);
+            Ok(())
         }
+
         CliCommand::Generate {
             dry_run,
             interactive,
-        } => {
-            if dry_run {
-                println!("Would create files: commit_message.md, .commitignore");
-                println!("Would add files to .git/info/exclude");
-                return Ok(());
-            }
+        } => handle_generate(dry_run, interactive, cli.verbose, &config),
 
-            create_needed_files()?;
+        CliCommand::Initialize { editor, dry_run } => handle_initialize(&editor, dry_run, &config),
 
-            let commit_type =
-                COMMIT_TYPES[Select::with_theme(&my_clap_theme::ColorfulTheme::default())
-                    .default(0)
-                    .items(&COMMIT_TYPES)
-                    .interact()
-                    .unwrap()];
+        CliCommand::ListStatus => handle_list_status(),
 
-            generate_commit_message(commit_type, cli.verbose)?;
+        CliCommand::Push { args, dry_run } => handle_push(&args, dry_run, cli.verbose),
 
-            if interactive {
-                // Interactive mode: let the user input the commit message directly in the terminal
-                use dialoguer::Input;
-                use std::fs;
-
-                println!("\n📝 Interactive mode: Enter your commit message.");
-                println!("💡 Tip: Keep it concise and descriptive.");
-
-                let message: String = Input::with_theme(&my_clap_theme::ColorfulTheme::default())
-                    .with_prompt("Message")
-                    .interact()
-                    .unwrap();
-
-                if message.trim().is_empty() {
-                    println!("⚠️  Empty message provided. Exiting.");
-                    return Ok(());
-                }
-
-                // Generate simple commit message format: [commit_nb] (type on branch) message
-                let commit_number = crate::git_related::get_current_commit_nb()? + 1;
-                let branch_name = crate::git_related::format_branch_name(
-                    &COMMIT_TYPES,
-                    &crate::git_related::get_current_branch()?,
-                );
-
-                let formatted_message = format!(
-                    "[{}] ({} on {}) {}",
-                    commit_number,
-                    commit_type,
-                    branch_name,
-                    message.trim()
-                );
-
-                // Write the simple formatted message to commit_message.md
-                fs::write(COMMIT_MESSAGE_FILE_PATH, formatted_message)?;
-
-                println!("\n✅ Commit message created!");
-                println!(
-                    "📄 Message: [{}] ({} on {}) {}",
-                    commit_number,
-                    commit_type,
-                    branch_name,
-                    message.trim()
-                );
-            } else {
-                // Original behavior: open editor
-                let editor = config.get_editor()?;
-
-                Command::new(editor)
-                    .arg(COMMIT_MESSAGE_FILE_PATH)
-                    .spawn()
-                    .expect("Failed to spawn editor")
-                    .wait()
-                    .expect("Failed to wait for editor");
-            }
-        }
-        CliCommand::Initialize { editor, dry_run } => {
-            if dry_run {
-                println!("Would create config file with editor: {editor}");
-                return Ok(());
-            }
-            config.create_config_file(&editor)?;
-        }
-        CliCommand::ListStatus => {
-            let files = get_status_files()?;
-            // Print each file on a new line for fish shell completion
-            for file in files {
-                println!("{file}");
-            }
-        }
-        CliCommand::Push { args, dry_run } => {
-            git_push(&args, cli.verbose, dry_run)?;
-        }
-        CliCommand::Set { editor, dry_run } => {
-            if dry_run {
-                println!("Would set editor to: {editor}");
-                return Ok(());
-            }
-            config.set_editor(&editor)?;
-        }
+        CliCommand::Set { editor, dry_run } => handle_set(&editor, dry_run, &config),
     }
-
-    Ok(())
 }
 
 #[cfg(test)]

@@ -561,7 +561,7 @@ pub fn git_get_top_level_path() -> Result<PathBuf> {
 /// git_push(&vec![], false, true)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn git_push(args: &Vec<String>, verbose: bool, dry_run: bool) -> Result<()> {
+pub fn git_push(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
     if verbose {
         println!("\nPushing...");
     }
