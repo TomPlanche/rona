@@ -25,7 +25,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }
-clap_complete = "4.5.51"
+clap_complete = "4.5.52"
 console = "0.15.11"
 dialoguer = "0.11.0"
 glob = "0.3.2"
