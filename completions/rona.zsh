@@ -84,7 +84,7 @@ _arguments "${_arguments_options[@]}" : \
 '--dry-run[Show what would be pushed without actually pushing]' \
 '-h[Print help]' \
 '--help[Print help]' \
-'*::args -- Additionnal arguments to pass to the push command:_default' \
+'*::args -- Additional arguments to pass to the push command:_default' \
 && ret=0
 ;;
 (set-editor)

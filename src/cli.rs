@@ -114,7 +114,7 @@ pub(crate) enum CliCommand {
         #[arg(long, default_value_t = false)]
         dry_run: bool,
 
-        /// Additionnal arguments to pass to the push command
+        /// Additional arguments to pass to the push command
         #[arg(allow_hyphen_values = true)]
         args: Vec<String>,
     },

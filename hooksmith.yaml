@@ -8,6 +8,7 @@ pre-commit:
         - cargo run -- completion powershell > completions/rona.ps1
         - cargo run -- completion zsh > completions/rona.zsh
         - git add completions/rona*
+        - typos
 pre-push:
     commands:
         - cargo install cargo-audit && cargo audit
