@@ -199,7 +199,7 @@ fn handle_commit(args: &[String], push: bool, dry_run: bool, verbose: bool) -> R
     git_commit(args, verbose, dry_run)?;
 
     if push {
-        git_push(args, verbose, dry_run)?;
+        git_push(&[], verbose, dry_run)?;
     }
 
     Ok(())
