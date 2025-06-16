@@ -828,6 +828,7 @@ pub fn read_git_status() -> Result<String> {
 ///
 /// # Returns
 /// * `Result<Vec<String>>` - The extracted filenames or an error message
+#[doc(hidden)]
 fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
     let regex = Regex::new(pattern).map_err(|e| GitError::InvalidStatus {
         output: format!("Failed to compile regex pattern: {e}"),
@@ -865,7 +866,7 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
 ///
 /// # Returns
 /// * `Result<()>` - `Ok(())` if the command succeeded, `Err(RonaError)` if it failed
-/// ```
+#[doc(hidden)]
 fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()> {
     if output.status.success() {
         if verbose {

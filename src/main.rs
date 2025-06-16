@@ -69,6 +69,7 @@ fn main() {
     }
 }
 
+#[doc(hidden)]
 fn inner_main() -> Result<()> {
     run()?;
 
