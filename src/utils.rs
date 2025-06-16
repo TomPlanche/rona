@@ -33,6 +33,7 @@ use std::{
 };
 
 /// Trait for message types.
+#[doc(hidden)]
 trait MessageType {
     /// The emoji prefix for each message type (e.g., "🚨 ERROR")
     const PREFIX: &'static str;
@@ -42,6 +43,7 @@ trait MessageType {
 }
 
 // Define the message types
+#[doc(hidden)]
 struct Error;
 
 // Implement the MessageType trait for each type

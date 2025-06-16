@@ -158,11 +158,13 @@ pub(crate) struct Cli {
 }
 
 /// Build the CLI command structure for generating completions
+#[doc(hidden)]
 fn build_cli() -> ClapCommand {
     Cli::command()
 }
 
 /// Print custom fish shell completions that enhance the auto-generated ones
+#[doc(hidden)]
 fn print_fish_custom_completions() {
     println!();
     println!("# === CUSTOM RONA COMPLETIONS ===");
@@ -179,6 +181,7 @@ fn print_fish_custom_completions() {
 }
 
 /// Handle the `AddWithExclude` command
+#[doc(hidden)]
 fn handle_add_with_exclude(exclude: &[String], dry_run: bool, verbose: bool) -> Result<()> {
     let patterns: Vec<Pattern> = exclude
         .iter()
@@ -190,6 +193,7 @@ fn handle_add_with_exclude(exclude: &[String], dry_run: bool, verbose: bool) -> 
 }
 
 /// Handle the Commit command
+#[doc(hidden)]
 fn handle_commit(args: &[String], push: bool, dry_run: bool, verbose: bool) -> Result<()> {
     git_commit(args, verbose, dry_run)?;
 
@@ -200,6 +204,7 @@ fn handle_commit(args: &[String], push: bool, dry_run: bool, verbose: bool) -> R
 }
 
 /// Handle the Completion command
+#[doc(hidden)]
 fn handle_completion(shell: Shell) {
     let mut cmd = build_cli();
     generate(shell, &mut cmd, "rona", &mut io::stdout());
