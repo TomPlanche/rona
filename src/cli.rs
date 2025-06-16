@@ -189,6 +189,7 @@ fn handle_add_with_exclude(exclude: &[String], dry_run: bool, verbose: bool) -> 
         .collect();
 
     git_add_with_exclude_patterns(&patterns, verbose, dry_run)?;
+
     Ok(())
 }
 
@@ -200,6 +201,7 @@ fn handle_commit(args: &[String], push: bool, dry_run: bool, verbose: bool) -> R
     if push {
         git_push(args, verbose, dry_run)?;
     }
+
     Ok(())
 }
 
@@ -238,6 +240,7 @@ fn handle_generate(dry_run: bool, interactive: bool, verbose: bool, config: &Con
     } else {
         handle_editor_mode(config)?;
     }
+
     Ok(())
 }
 
@@ -285,6 +288,7 @@ fn handle_interactive_mode(commit_type: &str) -> Result<()> {
         branch_name,
         message.trim()
     );
+
     Ok(())
 }
 
@@ -298,6 +302,7 @@ fn handle_editor_mode(config: &Config) -> Result<()> {
         .expect("Failed to spawn editor")
         .wait()
         .expect("Failed to wait for editor");
+
     Ok(())
 }
 
@@ -307,23 +312,28 @@ fn handle_initialize(editor: &str, dry_run: bool, config: &Config) -> Result<()>
         println!("Would create config file with editor: {editor}");
         return Ok(());
     }
+
     config.create_config_file(editor)?;
+
     Ok(())
 }
 
 /// Handle the `ListStatus` command
 fn handle_list_status() -> Result<()> {
     let files = get_status_files()?;
+
     // Print each file on a new line for fish shell completion
     for file in files {
         println!("{file}");
     }
+
     Ok(())
 }
 
 /// Handle the Push command
 fn handle_push(args: &[String], dry_run: bool, verbose: bool) -> Result<()> {
     git_push(args, verbose, dry_run)?;
+
     Ok(())
 }
 
@@ -333,7 +343,9 @@ fn handle_set(editor: &str, dry_run: bool, config: &Config) -> Result<()> {
         println!("Would set editor to: {editor}");
         return Ok(());
     }
+
     config.set_editor(editor)?;
+
     Ok(())
 }
 
@@ -362,6 +374,7 @@ pub fn run() -> Result<()> {
 
         CliCommand::Completion { shell } => {
             handle_completion(shell);
+
             Ok(())
         }
 
@@ -868,12 +881,14 @@ mod cli_tests {
     #[test]
     fn test_invalid_command() {
         let args = vec!["rona", "--invalid"];
+
         assert!(Cli::try_parse_from(args).is_err());
     }
 
     #[test]
     fn test_missing_required_value() {
         let args = vec!["rona", "-s"]; // missing editor value
+
         assert!(Cli::try_parse_from(args).is_err());
     }
 
@@ -883,6 +898,7 @@ mod cli_tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         assert!(cli.verbose);
+
         match cli.command {
             CliCommand::Commit {
                 args,
