@@ -89,6 +89,10 @@ pub(crate) enum CliCommand {
         /// Interactive mode - input the commit message directly in the terminal
         #[arg(short = 'i', long = "interactive", default_value_t = false)]
         interactive: bool,
+
+        /// No commit number
+        #[arg(short = 'n', long = "no-commit-number", default_value_t = false)]
+        no_commit_number: bool,
     },
 
     /// Initialize the rona configuration file.
@@ -180,25 +184,41 @@ fn print_fish_custom_completions() {
     );
 }
 
-/// Handle the `AddWithExclude` command
-#[doc(hidden)]
-fn handle_add_with_exclude(exclude: &[String], dry_run: bool, verbose: bool) -> Result<()> {
+/// Handle the `AddWithExclude` command which adds files to git while excluding specified patterns.
+///
+/// # Arguments
+/// * `exclude` - List of glob patterns for files to exclude from git add
+/// * `config` - Global configuration including verbose and dry-run settings
+///
+/// # Errors
+/// * If any glob pattern is invalid
+/// * If git add operation fails
+/// * If reading git status fails
+fn handle_add_with_exclude(exclude: &[String], config: &Config) -> Result<()> {
     let patterns: Vec<Pattern> = exclude
         .iter()
         .map(|p| Pattern::new(p).expect("Invalid glob pattern"))
         .collect();
 
-    git_add_with_exclude_patterns(&patterns, verbose, dry_run)?;
+    git_add_with_exclude_patterns(&patterns, config.verbose, config.dry_run)?;
     Ok(())
 }
 
-/// Handle the Commit command
-#[doc(hidden)]
-fn handle_commit(args: &[String], push: bool, dry_run: bool, verbose: bool) -> Result<()> {
-    git_commit(args, verbose, dry_run)?;
+/// Handle the Commit command which commits changes using the message from `commit_message.md`.
+///
+/// # Arguments
+/// * `args` - Additional arguments to pass to git commit
+/// * `push` - Whether to push changes after committing
+/// * `config` - Global configuration including verbose and dry-run settings
+///
+/// # Errors
+/// * If git commit operation fails
+/// * If push is true and git push operation fails
+fn handle_commit(args: &[String], push: bool, config: &Config) -> Result<()> {
+    git_commit(args, config.verbose, config.dry_run)?;
 
     if push {
-        git_push(args, verbose, dry_run)?;
+        git_push(args, config.verbose, config.dry_run)?;
     }
     Ok(())
 }
@@ -215,9 +235,20 @@ fn handle_completion(shell: Shell) {
     }
 }
 
-/// Handle the Generate command
-fn handle_generate(dry_run: bool, interactive: bool, verbose: bool, config: &Config) -> Result<()> {
-    if dry_run {
+/// Handle the Generate command which creates a new commit message file.
+///
+/// # Arguments
+/// * `interactive` - Whether to prompt for commit message in terminal
+/// * `no_commit_number` - Whether to include commit number in message
+/// * `config` - Global configuration including verbose and dry-run settings
+///
+/// # Errors
+/// * If creating needed files fails
+/// * If generating commit message fails
+/// * If writing commit message fails
+/// * If launching editor fails (in non-interactive mode)
+fn handle_generate(interactive: bool, no_commit_number: bool, config: &Config) -> Result<()> {
+    if config.dry_run {
         println!("Would create files: commit_message.md, .commitignore");
         println!("Would add files to .git/info/exclude");
         return Ok(());
@@ -231,10 +262,10 @@ fn handle_generate(dry_run: bool, interactive: bool, verbose: bool, config: &Con
         .interact()
         .unwrap()];
 
-    generate_commit_message(commit_type, verbose)?;
+    generate_commit_message(commit_type, config.verbose, no_commit_number)?;
 
     if interactive {
-        handle_interactive_mode(commit_type)?;
+        handle_interactive_mode(commit_type, no_commit_number)?;
     } else {
         handle_editor_mode(config)?;
     }
@@ -242,7 +273,7 @@ fn handle_generate(dry_run: bool, interactive: bool, verbose: bool, config: &Con
 }
 
 /// Handle interactive mode for generate command
-fn handle_interactive_mode(commit_type: &str) -> Result<()> {
+fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<()> {
     use dialoguer::Input;
     use std::fs;
 
@@ -259,32 +290,29 @@ fn handle_interactive_mode(commit_type: &str) -> Result<()> {
         return Ok(());
     }
 
-    // Generate a simple commit message format: [commit_nb] (type on branch) message
-    let commit_number = crate::git_related::get_current_commit_nb()? + 1;
     let branch_name = crate::git_related::format_branch_name(
         &COMMIT_TYPES,
         &crate::git_related::get_current_branch()?,
     );
 
-    let formatted_message = format!(
-        "[{}] ({} on {}) {}",
-        commit_number,
-        commit_type,
-        branch_name,
-        message.trim()
-    );
+    let formatted_message = if no_commit_number {
+        format!("({} on {}) {}", commit_type, branch_name, message.trim())
+    } else {
+        let commit_number = crate::git_related::get_current_commit_nb()? + 1;
+        format!(
+            "[{}] ({} on {}) {}",
+            commit_number,
+            commit_type,
+            branch_name,
+            message.trim()
+        )
+    };
 
     // Write the simple formatted message to commit_message.md
-    fs::write(COMMIT_MESSAGE_FILE_PATH, formatted_message)?;
+    fs::write(COMMIT_MESSAGE_FILE_PATH, &formatted_message)?;
 
     println!("\n✅ Commit message created!");
-    println!(
-        "📄 Message: [{}] ({} on {}) {}",
-        commit_number,
-        commit_type,
-        branch_name,
-        message.trim()
-    );
+    println!("📄 Message: {formatted_message}");
     Ok(())
 }
 
@@ -301,9 +329,16 @@ fn handle_editor_mode(config: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Handle the Initialize command
-fn handle_initialize(editor: &str, dry_run: bool, config: &Config) -> Result<()> {
-    if dry_run {
+/// Handle the Initialize command which creates the initial configuration file.
+///
+/// # Arguments
+/// * `editor` - The editor command to configure
+/// * `config` - Global configuration including verbose and dry-run settings
+///
+/// # Errors
+/// * If creating configuration file fails
+fn handle_initialize(editor: &str, config: &Config) -> Result<()> {
+    if config.dry_run {
         println!("Would create config file with editor: {editor}");
         return Ok(());
     }
@@ -321,15 +356,29 @@ fn handle_list_status() -> Result<()> {
     Ok(())
 }
 
-/// Handle the Push command
-fn handle_push(args: &[String], dry_run: bool, verbose: bool) -> Result<()> {
-    git_push(args, verbose, dry_run)?;
+/// Handle the Push command which pushes changes to the remote repository.
+///
+/// # Arguments
+/// * `args` - Additional arguments to pass to git push
+/// * `config` - Global configuration including verbose and dry-run settings
+///
+/// # Errors
+/// * If git push operation fails
+fn handle_push(args: &[String], config: &Config) -> Result<()> {
+    git_push(args, config.verbose, config.dry_run)?;
     Ok(())
 }
 
-/// Handle the Set command
-fn handle_set(editor: &str, dry_run: bool, config: &Config) -> Result<()> {
-    if dry_run {
+/// Handle the Set command which updates the editor in the configuration.
+///
+/// # Arguments
+/// * `editor` - The editor command to set
+/// * `config` - Global configuration including verbose and dry-run settings
+///
+/// # Errors
+/// * If updating configuration file fails
+fn handle_set(editor: &str, config: &Config) -> Result<()> {
+    if config.dry_run {
         println!("Would set editor to: {editor}");
         return Ok(());
     }
@@ -337,28 +386,39 @@ fn handle_set(editor: &str, dry_run: bool, config: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Runs the program.
-///
-/// # Panics
-/// * If the given glob patterns are invalid.
+/// Runs the program by parsing command line arguments and executing the appropriate command.
 ///
 /// # Errors
-/// * Return an error if the command fails.
+/// * If creating configuration fails
+/// * If command execution fails
+/// * If any operation fails based on command-specific errors
+///
+/// # Returns
+/// * `Result<()>` - Ok if all operations succeed, Err with error details otherwise
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-    let config = Config::new()?;
+    let mut config = Config::new()?;
+
+    // Set the global flags in the config
+    config.set_verbose(cli.verbose);
 
     match cli.command {
         CliCommand::AddWithExclude {
             to_exclude: exclude,
             dry_run,
-        } => handle_add_with_exclude(&exclude, dry_run, cli.verbose),
+        } => {
+            config.set_dry_run(dry_run);
+            handle_add_with_exclude(&exclude, &config)
+        }
 
         CliCommand::Commit {
             args,
             push,
             dry_run,
-        } => handle_commit(&args, push, dry_run, cli.verbose),
+        } => {
+            config.set_dry_run(dry_run);
+            handle_commit(&args, push, &config)
+        }
 
         CliCommand::Completion { shell } => {
             handle_completion(shell);
@@ -368,15 +428,28 @@ pub fn run() -> Result<()> {
         CliCommand::Generate {
             dry_run,
             interactive,
-        } => handle_generate(dry_run, interactive, cli.verbose, &config),
+            no_commit_number,
+        } => {
+            config.set_dry_run(dry_run);
+            handle_generate(interactive, no_commit_number, &config)
+        }
 
-        CliCommand::Initialize { editor, dry_run } => handle_initialize(&editor, dry_run, &config),
+        CliCommand::Initialize { editor, dry_run } => {
+            config.set_dry_run(dry_run);
+            handle_initialize(&editor, &config)
+        }
 
         CliCommand::ListStatus => handle_list_status(),
 
-        CliCommand::Push { args, dry_run } => handle_push(&args, dry_run, cli.verbose),
+        CliCommand::Push { args, dry_run } => {
+            config.set_dry_run(dry_run);
+            handle_push(&args, &config)
+        }
 
-        CliCommand::Set { editor, dry_run } => handle_set(&editor, dry_run, &config),
+        CliCommand::Set { editor, dry_run } => {
+            config.set_dry_run(dry_run);
+            handle_set(&editor, &config)
+        }
     }
 }
 
@@ -673,9 +746,11 @@ mod cli_tests {
             CliCommand::Generate {
                 dry_run,
                 interactive,
+                no_commit_number,
             } => {
                 assert!(!dry_run);
                 assert!(!interactive);
+                assert!(!no_commit_number);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -690,9 +765,11 @@ mod cli_tests {
             CliCommand::Generate {
                 dry_run,
                 interactive,
+                no_commit_number,
             } => {
                 assert!(!dry_run);
                 assert!(interactive);
+                assert!(!no_commit_number);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -707,9 +784,68 @@ mod cli_tests {
             CliCommand::Generate {
                 dry_run,
                 interactive,
+                no_commit_number,
             } => {
                 assert!(!dry_run);
                 assert!(interactive);
+                assert!(!no_commit_number);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_generate_no_commit_number() {
+        let args = vec!["rona", "-g", "-n"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Generate {
+                dry_run,
+                interactive,
+                no_commit_number,
+            } => {
+                assert!(!dry_run);
+                assert!(!interactive);
+                assert!(no_commit_number);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_generate_no_commit_number_long_form() {
+        let args = vec!["rona", "-g", "--no-commit-number"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Generate {
+                dry_run,
+                interactive,
+                no_commit_number,
+            } => {
+                assert!(!dry_run);
+                assert!(!interactive);
+                assert!(no_commit_number);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_generate_interactive_no_commit_number() {
+        let args = vec!["rona", "-g", "-i", "-n"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Generate {
+                dry_run,
+                interactive,
+                no_commit_number,
+            } => {
+                assert!(!dry_run);
+                assert!(interactive);
+                assert!(no_commit_number);
             }
             _ => panic!("Wrong command parsed"),
         }

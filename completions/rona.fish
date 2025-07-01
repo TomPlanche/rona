@@ -45,6 +45,7 @@ complete -c rona -n "__fish_rona_using_subcommand commit" -s h -l help -d 'Print
 complete -c rona -n "__fish_rona_using_subcommand completion" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand generate" -l dry-run -d 'Show what would be generated without creating files'
 complete -c rona -n "__fish_rona_using_subcommand generate" -s i -l interactive -d 'Interactive mode - input the commit message directly in the terminal'
+complete -c rona -n "__fish_rona_using_subcommand generate" -s n -l no-commit-number -d 'No commit number'
 complete -c rona -n "__fish_rona_using_subcommand generate" -s h -l help -d 'Print help'
 complete -c rona -n "__fish_rona_using_subcommand init" -l dry-run -d 'Show what would be initialized without creating files'
 complete -c rona -n "__fish_rona_using_subcommand init" -s h -l help -d 'Print help'

@@ -62,6 +62,8 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be generated without creating files')
             [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Interactive mode - input the commit message directly in the terminal')
             [CompletionResult]::new('--interactive', '--interactive', [CompletionResultType]::ParameterName, 'Interactive mode - input the commit message directly in the terminal')
+            [CompletionResult]::new('-n', '-n', [CompletionResultType]::ParameterName, 'No commit number')
+            [CompletionResult]::new('--no-commit-number', '--no-commit-number', [CompletionResultType]::ParameterName, 'No commit number')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break

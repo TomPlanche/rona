@@ -55,6 +55,8 @@ set edit:completion:arg-completer[rona] = {|@words|
             cand --dry-run 'Show what would be generated without creating files'
             cand -i 'Interactive mode - input the commit message directly in the terminal'
             cand --interactive 'Interactive mode - input the commit message directly in the terminal'
+            cand -n 'No commit number'
+            cand --no-commit-number 'No commit number'
             cand -h 'Print help'
             cand --help 'Print help'
         }

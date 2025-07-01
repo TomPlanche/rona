@@ -61,6 +61,8 @@ _arguments "${_arguments_options[@]}" : \
 '--dry-run[Show what would be generated without creating files]' \
 '-i[Interactive mode - input the commit message directly in the terminal]' \
 '--interactive[Interactive mode - input the commit message directly in the terminal]' \
+'-n[No commit number]' \
+'--no-commit-number[No commit number]' \
 '-h[Print help]' \
 '--help[Print help]' \
 && ret=0

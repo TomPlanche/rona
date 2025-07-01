@@ -32,35 +32,83 @@ use crate::{
 // Make this public so tests can use it directly
 pub const CONFIG_FOLDER_NAME: &str = "rona-test-config";
 
-/// Main configuration struct that handles all config operations
+/// Main configuration struct that handles all config operations.
+/// This includes both persistent configuration (stored in config file)
+/// and runtime configuration (command-line flags).
+///
+/// # Fields
+/// * `root` - The root path for configuration files
+/// * `verbose` - Whether to show detailed output
+/// * `dry_run` - Whether to simulate operations without making changes
 pub struct Config {
     root: PathBuf,
+    pub(crate) verbose: bool,
+    pub(crate) dry_run: bool,
 }
 
 impl Config {
-    /// Creates a new Config instance with the default root
+    /// Creates a new Config instance with the default root path and default settings.
     ///
     /// # Errors
-    /// * When getting the config root fails
+    /// * If getting the config root path fails
+    /// * If the home directory cannot be determined
+    ///
+    /// # Returns
+    /// * `Result<Config>` - A new Config instance with default settings
     pub fn new() -> Result<Self> {
         let root = Config::get_config_root()?;
-        Ok(Config { root })
+        let config = Config {
+            root,
+            verbose: false,
+            dry_run: false,
+        };
+
+        Ok(config)
     }
 
-    /// Creates a new Config instance with a custom root path
+    /// Creates a new Config instance with a custom root path.
+    /// This is primarily used for testing purposes.
     ///
     /// # Arguments
-    /// * `root` - The custom root path
+    /// * `root` - The custom root path for configuration files
+    ///
+    /// # Returns
+    /// * `Config` - A new Config instance with the specified root and default settings
     pub fn with_root(root: impl Into<PathBuf>) -> Self {
-        Config { root: root.into() }
+        Config {
+            root: root.into(),
+            verbose: false,
+            dry_run: false,
+        }
+    }
+
+    /// Sets the verbose flag which controls detailed output logging.
+    ///
+    /// # Arguments
+    /// * `verbose` - Whether to enable verbose output
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
+    }
+
+    /// Sets the `dry_run` flag which controls whether operations are simulated.
+    /// When true, operations will print what would happen without making actual changes.
+    ///
+    /// # Arguments
+    /// * `dry_run` - Whether to enable dry run mode
+    pub fn set_dry_run(&mut self, dry_run: bool) {
+        self.dry_run = dry_run;
     }
 
     /// Retrieves the editor from the configuration file.
     ///
     /// # Errors
-    /// * If the configuration file cannot be read, or if it is inexistent.
-    /// * If the regex pattern fails to compile.
-    /// * If the regex pattern fails to match the editor.
+    /// * If the configuration file cannot be read
+    /// * If the configuration file does not exist
+    /// * If the regex pattern fails to compile
+    /// * If the editor setting is missing or invalid
+    ///
+    /// # Returns
+    /// * `Result<String>` - The configured editor command
     pub fn get_editor(&self) -> Result<String> {
         let config_file = self.get_config_file_path()?;
 
@@ -91,10 +139,12 @@ impl Config {
     /// Sets the editor in the configuration file.
     ///
     /// # Arguments
-    /// * `editor` - The editor to set.
+    /// * `editor` - The editor command to set
     ///
     /// # Errors
-    /// * if the configuration file cannot be read or written.
+    /// * If the configuration file cannot be read or written
+    /// * If the configuration file does not exist
+    /// * If the regex pattern fails to compile
     pub fn set_editor(&self, editor: &str) -> Result<()> {
         let config_file = self.get_config_file_path()?;
 
@@ -122,14 +172,15 @@ impl Config {
         Ok(())
     }
 
-    /// Creates a new configuration file
+    /// Creates a new configuration file with the specified editor.
     ///
     /// # Arguments
-    /// * `editor` - The editor to use
+    /// * `editor` - The editor command to configure
     ///
     /// # Errors
-    /// * If an I/O error occurs while creating the configuration file
-    /// * If the file already exists
+    /// * If creating the configuration directory fails
+    /// * If writing the configuration file fails
+    /// * If the configuration file already exists
     pub fn create_config_file(&self, editor: &str) -> Result<()> {
         let config_folder = self.get_config_folder_path()?;
 
@@ -166,31 +217,32 @@ impl Config {
     /// * If the home directory cannot be determined
     ///
     /// # Returns
-    /// The path to the configuration folder.
+    /// * `Result<PathBuf>` - The path to the configuration folder
     pub fn get_config_folder_path(&self) -> Result<PathBuf> {
         let config_folder_path = self.root.join(".config").join("rona");
         Ok(config_folder_path)
     }
 
-    /// Returns the path to the configuration file
+    /// Returns the path to the configuration file.
     ///
     /// # Errors
     /// * If the home directory cannot be determined
     ///
     /// # Returns
-    /// The path to the configuration file
+    /// * `Result<PathBuf>` - The path to the configuration file
     pub fn get_config_file_path(&self) -> Result<PathBuf> {
         let config_folder_path = self.get_config_folder_path()?;
         Ok(config_folder_path.join("config.toml"))
     }
 
-    /// Returns the root directory for the configuration files
+    /// Returns the root directory for the configuration files.
+    /// Uses the test directory if `RONA_TEST_DIR` is set or running tests.
     ///
     /// # Errors
     /// * If the home directory cannot be determined
     ///
     /// # Returns
-    /// The root directory for the configuration files
+    /// * `Result<PathBuf>` - The root directory for configuration files
     fn get_config_root() -> Result<PathBuf> {
         // Use environment variable for testing
         if env::var("RONA_TEST_DIR").is_ok() || cfg!(test) {
@@ -206,13 +258,13 @@ impl Config {
         }
     }
 
-    /// Returns the regex to match the editor in the configuration file
+    /// Returns the regex pattern used to match the editor setting in the config file.
     ///
     /// # Errors
-    /// * If the regex cannot be compiled
+    /// * If the regex pattern fails to compile
     ///
     /// # Returns
-    /// The regex to match the editor in the configuration file
+    /// * `Result<Regex>` - The compiled regex pattern
     fn get_regex_editor() -> Result<Regex> {
         Regex::new(r#"editor\s*=\s*"(.*?)""#).map_err(|e| ConfigError::RegexError(e).into())
     }
