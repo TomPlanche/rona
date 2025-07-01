@@ -18,7 +18,7 @@
 //!
 //! // Generate a commit message
 //! let commit_type = "feat";
-//! let message = generate_commit_message(commit_type, false)?;
+//! let message = generate_commit_message(commit_type, false, false)?;
 //!
 //! // Add files while excluding patterns
 //! let patterns = vec![];
@@ -205,7 +205,7 @@ pub fn get_current_branch() -> Result<String> {
 ///
 /// # Returns
 /// * `u16` - The number of commits
-pub fn get_current_commit_nb() -> Result<u16> {
+pub fn get_current_commit_nb() -> Result<u32> {
     let branch = get_current_branch()?;
 
     let output = Command::new("git")
@@ -215,7 +215,7 @@ pub fn get_current_commit_nb() -> Result<u16> {
         .output()?;
 
     let output_str = String::from_utf8_lossy(&output.stdout);
-    let commit_count = output_str.trim().parse::<u16>().unwrap_or(0);
+    let commit_count = output_str.trim().parse::<u32>().unwrap_or(0);
 
     Ok(commit_count)
 }
@@ -590,9 +590,14 @@ pub fn git_push(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
 /// * If we cannot read the commitignore file
 ///
 /// # Arguments
-/// * `commit_types` - `&str` - The commit types
+/// * `commit_type` - `&str` - The commit type
 /// * `verbose` - `bool` - Verbose the operation
-pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
+/// * `no_commit_number` - `bool` - Whether to include the commit number in the header
+pub fn generate_commit_message(
+    commit_type: &str,
+    verbose: bool,
+    no_commit_number: bool,
+) -> Result<()> {
     let commit_message_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
     // Empty the file if it exists
@@ -612,7 +617,7 @@ pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
         .open(commit_message_path)?;
 
     // Write header
-    write_commit_header(&mut commit_file, commit_type)?;
+    write_commit_header(&mut commit_file, commit_type, no_commit_number)?;
 
     // Get files to ignore
     let ignore_patterns = get_ignore_patterns()?;
@@ -644,17 +649,26 @@ pub fn generate_commit_message(commit_type: &str, verbose: bool) -> Result<()> {
 /// # Arguments
 /// * `commit_file` - The file to write to
 /// * `commit_type` - The type of commit
+/// * `no_commit_number` - Whether to include the commit number in the header
 ///
 /// # Errors
 /// * If writing to the file fails
-fn write_commit_header(commit_file: &mut File, commit_type: &str) -> Result<()> {
-    let commit_number = get_current_commit_nb()? + 1;
+fn write_commit_header(
+    commit_file: &mut File,
+    commit_type: &str,
+    no_commit_number: bool,
+) -> Result<()> {
     let branch_name = format_branch_name(&COMMIT_TYPES, &get_current_branch()?);
 
-    writeln!(
-        commit_file,
-        "[{commit_number}] ({commit_type} on {branch_name})\n\n"
-    )?;
+    if no_commit_number {
+        writeln!(commit_file, "({commit_type} on {branch_name})\n\n")?;
+    } else {
+        let commit_number = get_current_commit_nb()? + 1;
+        writeln!(
+            commit_file,
+            "[{commit_number}] ({commit_type} on {branch_name})\n\n"
+        )?;
+    }
 
     Ok(())
 }
