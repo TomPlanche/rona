@@ -44,6 +44,8 @@ _arguments "${_arguments_options[@]}" : \
 '-p[Whether to push the commit after committing]' \
 '--push[Whether to push the commit after committing]' \
 '--dry-run[Show what would be committed without actually committing]' \
+'-u[Create unsigned commit (default is to sign commits with -S)]' \
+'--unsigned[Create unsigned commit (default is to sign commits with -S)]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '*::args -- Additional arguments to pass to the commit command:_default' \
