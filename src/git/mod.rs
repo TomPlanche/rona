@@ -25,7 +25,7 @@ pub mod status;
 pub use branch::{format_branch_name, get_current_branch};
 pub use commit::{
     COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, generate_commit_message, get_current_commit_nb,
-    git_commit,
+    git_commit, is_gpg_signing_available,
 };
 pub use files::create_needed_files;
 pub use remote::git_push;

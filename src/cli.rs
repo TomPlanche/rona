@@ -67,7 +67,7 @@ pub(crate) enum CliCommand {
         #[arg(long, default_value_t = false)]
         dry_run: bool,
 
-        /// Create unsigned commit (default is to sign commits with -S)
+        /// Create unsigned commit (default is to auto-detect GPG availability and sign if possible)
         #[arg(short = 'u', long = "unsigned", default_value_t = false)]
         unsigned: bool,
 
