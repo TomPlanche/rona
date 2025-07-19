@@ -151,36 +151,5 @@ pub fn process_git_status(message: &str) -> Result<Vec<String>> {
     extract_filenames(message, r"^[MTARCU][A-Z\?\! ]\s(.+?)(?:\s->\s(.+))?$")
 }
 
-/// Extracts filenames from a git status message using a regex pattern.
-///
-/// # Errors
-/// * If the regex pattern is invalid
-/// * If the filename cannot be captured from a line
-///
-/// # Returns
-/// * `Result<Vec<String>>` - The extracted filenames or an error message
-#[doc(hidden)]
-fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
-    let regex = Regex::new(pattern).map_err(|e| {
-        RonaError::Git(GitError::InvalidStatus {
-            output: format!("Failed to compile regex pattern: {e}"),
-        })
-    })?;
-
-    let mut result = Vec::new();
-    for line in message.lines() {
-        if regex.is_match(line) {
-            if let Some(captures) = regex.captures(line) {
-                // If we have a second capture group (renamed file), use that
-                // Otherwise use the first capture group
-                if let Some(new_name) = captures.get(2) {
-                    result.push(new_name.as_str().to_string());
-                } else if let Some(file_name) = captures.get(1) {
-                    result.push(file_name.as_str().to_string());
-                }
-            }
-        }
-    }
-
-    Ok(result)
-}
+// Use the shared extract_filenames function from the parent module
+use super::extract_filenames;

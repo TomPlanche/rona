@@ -2,7 +2,7 @@
 //!
 //! Remote repository operations including push functionality with dry-run support.
 
-use std::process::{Command, Output};
+use std::process::Command;
 
 use crate::errors::Result;
 
@@ -72,28 +72,5 @@ pub fn git_push(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
 ///
 /// # Returns
 /// * `Result<()>` - `Ok(())` if the command succeeded, `Err(RonaError)` if it failed
-#[doc(hidden)]
-fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()> {
-    use crate::errors::{RonaError, pretty_print_error};
-
-    if output.status.success() {
-        if verbose {
-            println!("{method_name} successful!");
-        }
-
-        if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
-        }
-
-        Ok(())
-    } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-
-        println!("\n🚨 Git {method_name} failed:");
-        pretty_print_error(&error_message);
-
-        Err(RonaError::Io(std::io::Error::other(format!(
-            "Git {method_name} failed"
-        ))))
-    }
-}
+// Use the shared handle_output function from the parent module
+use super::handle_output;
