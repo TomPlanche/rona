@@ -109,7 +109,7 @@ _rona() {
             return 0
             ;;
         rona__commit)
-            opts="-p -h --push --dry-run --help [ARGS]..."
+            opts="-p -u -h --push --dry-run --unsigned --help [ARGS]..."
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

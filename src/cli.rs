@@ -28,7 +28,7 @@
 use crate::{
     config::Config,
     errors::Result,
-    git_related::{
+    git::{
         COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, generate_commit_message,
         get_status_files, git_add_with_exclude_patterns, git_commit, git_push,
     },
@@ -39,6 +39,7 @@ use clap_complete::{Shell, generate};
 use dialoguer::Select;
 use glob::Pattern;
 use std::{io, process::Command};
+use crate::git::{format_branch_name, get_current_branch, get_current_commit_nb};
 
 /// CLI's commands
 #[derive(Subcommand)]
@@ -65,6 +66,10 @@ pub(crate) enum CliCommand {
         /// Show what would be committed without actually committing
         #[arg(long, default_value_t = false)]
         dry_run: bool,
+
+        /// Create unsigned commit (default is to sign commits with -S)
+        #[arg(short = 'u', long = "unsigned", default_value_t = false)]
+        unsigned: bool,
 
         /// Additional arguments to pass to the commit command
         #[arg(allow_hyphen_values = true)]
@@ -209,13 +214,14 @@ fn handle_add_with_exclude(exclude: &[String], config: &Config) -> Result<()> {
 /// # Arguments
 /// * `args` - Additional arguments to pass to git commit
 /// * `push` - Whether to push changes after committing
+/// * `unsigned` - Whether to create an unsigned commit (skips -S flag)
 /// * `config` - Global configuration including verbose and dry-run settings
 ///
 /// # Errors
 /// * If git commit operation fails
 /// * If push is true and git push operation fails
-fn handle_commit(args: &[String], push: bool, config: &Config) -> Result<()> {
-    git_commit(args, config.verbose, config.dry_run)?;
+fn handle_commit(args: &[String], push: bool, unsigned: bool, config: &Config) -> Result<()> {
+    git_commit(args, unsigned, config.verbose, config.dry_run)?;
 
     if push {
         git_push(args, config.verbose, config.dry_run)?;
@@ -290,15 +296,15 @@ fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<
         return Ok(());
     }
 
-    let branch_name = crate::git_related::format_branch_name(
+    let branch_name = format_branch_name(
         &COMMIT_TYPES,
-        &crate::git_related::get_current_branch()?,
+        &get_current_branch()?,
     );
 
     let formatted_message = if no_commit_number {
         format!("({} on {}) {}", commit_type, branch_name, message.trim())
     } else {
-        let commit_number = crate::git_related::get_current_commit_nb()? + 1;
+        let commit_number = get_current_commit_nb()? + 1;
         format!(
             "[{}] ({} on {}) {}",
             commit_number,
@@ -415,9 +421,10 @@ pub fn run() -> Result<()> {
             args,
             push,
             dry_run,
+            unsigned,
         } => {
             config.set_dry_run(dry_run);
-            handle_commit(&args, push, &config)
+            handle_commit(&args, push, unsigned, &config)
         }
 
         CliCommand::Completion { shell } => {
@@ -540,10 +547,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(!push);
                 assert!(args.is_empty());
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -559,10 +568,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(push);
                 assert!(args.is_empty());
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -578,10 +589,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(!push);
                 assert_eq!(args, vec!["Regular commit message"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -597,10 +610,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(!push);
                 assert_eq!(args, vec!["--amend"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -616,10 +631,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(!push);
                 assert_eq!(args, vec!["--amend", "--no-edit"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -635,10 +652,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(push);
                 assert_eq!(args, vec!["--amend", "--no-edit"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -654,10 +673,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(push);
                 assert_eq!(args, vec!["Commit message"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -973,10 +994,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(!push); // --push should be treated as git arg
                 assert_eq!(args, vec!["--amend", "--push"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -992,10 +1015,12 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(!push);
                 assert_eq!(args, vec!["--push-to-upstream"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }
@@ -1024,10 +1049,75 @@ mod cli_tests {
                 args,
                 push,
                 dry_run,
+                unsigned,
             } => {
                 assert!(push);
                 assert_eq!(args, vec!["--amend", "--no-edit"]);
                 assert!(!dry_run);
+                assert!(!unsigned);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_commit_unsigned_short_flag() {
+        let args = vec!["rona", "-c", "-u"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+                unsigned,
+            } => {
+                assert!(!push);
+                assert!(args.is_empty());
+                assert!(!dry_run);
+                assert!(unsigned);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_commit_unsigned_long_flag() {
+        let args = vec!["rona", "-c", "--unsigned"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+                unsigned,
+            } => {
+                assert!(!push);
+                assert!(args.is_empty());
+                assert!(!dry_run);
+                assert!(unsigned);
+            }
+            _ => panic!("Wrong command parsed"),
+        }
+    }
+
+    #[test]
+    fn test_commit_unsigned_with_push_and_args() {
+        let args = vec!["rona", "-c", "-u", "--push", "--amend"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            CliCommand::Commit {
+                args,
+                push,
+                dry_run,
+                unsigned,
+            } => {
+                assert!(push);
+                assert_eq!(args, vec!["--amend"]);
+                assert!(!dry_run);
+                assert!(unsigned);
             }
             _ => panic!("Wrong command parsed"),
         }

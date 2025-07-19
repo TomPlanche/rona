@@ -79,14 +79,22 @@ rona -g -i
 
 4. Commit and push changes:
 ```bash
-# Commit with the prepared message
+# Commit with the prepared message (signed by default with -S)
 rona -c
+
+# Create an unsigned commit
+rona -c -u
+# or
+rona -c --unsigned
 
 # Commit and push in one command
 rona -c -p
 
 # Commit with additional Git arguments
 rona -c --no-verify
+
+# Unsigned commit with push
+rona -c -u -p
 
 # Commit and push with specific branch
 rona -c -p origin main
@@ -206,12 +214,32 @@ rona -a "*.rs" "*.tmp"  # Exclude Rust and temporary files
 ```
 
 ### `commit` (`-c`)
-Commit changes using prepared message.
+Commit changes using prepared message. **By default, commits are signed with `-S` flag**.
 
 ```bash
-rona commit [extra args]
+rona commit [OPTIONS] [extra args]
 # or
-rona -c [-p | --push] [extra args]
+rona -c [-p | --push] [-u | --unsigned] [extra args]
+```
+
+**Options:**
+- `-p, --push` - Push after committing
+- `-u, --unsigned` - Create unsigned commit (skips -S flag)  
+- `--dry-run` - Preview what would be committed
+
+**Examples:**
+```bash
+# Signed commit (default behavior)
+rona -c
+
+# Unsigned commit
+rona -c -u
+
+# Commit and push with signing
+rona -c -p
+
+# Unsigned commit with push
+rona -c -u -p
 ```
 
 ### `completion`

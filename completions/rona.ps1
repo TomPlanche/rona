@@ -49,6 +49,8 @@ Register-ArgumentCompleter -Native -CommandName 'rona' -ScriptBlock {
             [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Whether to push the commit after committing')
             [CompletionResult]::new('--push', '--push', [CompletionResultType]::ParameterName, 'Whether to push the commit after committing')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Show what would be committed without actually committing')
+            [CompletionResult]::new('-u', '-u', [CompletionResultType]::ParameterName, 'Create unsigned commit (default is to sign commits with -S)')
+            [CompletionResult]::new('--unsigned', '--unsigned', [CompletionResultType]::ParameterName, 'Create unsigned commit (default is to sign commits with -S)')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break

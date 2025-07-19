@@ -36,7 +36,7 @@
 //! - `cli`: Handles command-line interface and argument parsing
 //! - `config`: Manages application configuration
 //! - `errors`: Error handling and custom error types
-//! - `git_related`: Contains Git-related functionality
+//! - `git`: Organized Git-related functionality with focused submodules
 //! - `my_clap_theme`: Custom theme for command-line output
 //! - `utils`: Common utility functions
 //!
@@ -51,7 +51,6 @@ pub mod cli;
 pub mod config;
 pub mod errors;
 pub mod git;
-pub mod git_related;
 pub mod my_clap_theme;
 pub mod performance;
 pub mod utils;
