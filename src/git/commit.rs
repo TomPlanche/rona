@@ -7,7 +7,7 @@ use std::{
     fs::{File, OpenOptions, read_to_string, write},
     io::Write,
     path::Path,
-    process::{Command, Output},
+    process::Command,
 };
 
 use crate::{
@@ -151,6 +151,65 @@ pub fn is_gpg_signing_available() -> bool {
     }
 }
 
+/// Handles dry run output for commit operations.
+///
+/// # Arguments
+/// * `file_content` - The commit message content
+/// * `unsigned` - Whether the commit should be unsigned
+/// * `filtered_args` - Additional git arguments
+fn handle_dry_run_output(file_content: &str, unsigned: bool, filtered_args: &[String]) {
+    println!("Would commit with message:");
+    println!("---");
+    println!("{}", file_content.trim());
+    println!("---");
+
+    let gpg_available = is_gpg_signing_available();
+    let would_sign = !unsigned && gpg_available;
+
+    if unsigned {
+        println!("Would create unsigned commit");
+    } else if would_sign {
+        println!("Would sign commit with -S flag");
+    } else {
+        println!("Would create unsigned commit (GPG signing not available)");
+        if !gpg_available {
+            println!("⚠️  Warning: GPG signing not available or not configured.");
+            println!("   To suppress this warning, use the --unsigned (-u) flag.");
+        }
+    }
+
+    if !filtered_args.is_empty() {
+        println!("With additional args: {filtered_args:?}");
+    }
+}
+
+/// Configures signing for git commit and displays appropriate warnings.
+///
+/// # Arguments
+/// * `command` - The git command to configure
+/// * `unsigned` - Whether signing should be disabled
+/// * `verbose` - Whether to show verbose output
+///
+/// # Returns
+/// * `bool` - Whether the commit will be signed
+fn configure_commit_signing(command: &mut Command, unsigned: bool, verbose: bool) -> bool {
+    let gpg_available = is_gpg_signing_available();
+    let should_sign = !unsigned && gpg_available;
+
+    if should_sign {
+        command.arg("-S");
+    } else if !unsigned && !gpg_available {
+        println!(
+            "⚠️  Warning: GPG signing not available or not configured. Creating unsigned commit."
+        );
+        println!("   To suppress this warning, use the --unsigned (-u) flag.");
+    } else if verbose && !unsigned {
+        println!("GPG signing not available, creating unsigned commit");
+    }
+
+    should_sign
+}
+
 /// Commits files to the git repository.
 ///
 /// This function reads the commit message from `commit_message.md` and creates
@@ -196,7 +255,6 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
     std::env::set_current_dir(project_root)?;
 
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
-
     if !commit_file_path.exists() {
         return Err(RonaError::Io(std::io::Error::other(
             "Commit message file not found",
@@ -213,56 +271,19 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
         .collect();
 
     if dry_run {
-        println!("Would commit with message:");
-        println!("---");
-        println!("{}", file_content.trim());
-        println!("---");
-
-        let gpg_available = is_gpg_signing_available();
-        let would_sign = !unsigned && gpg_available;
-
-        if unsigned {
-            println!("Would create unsigned commit");
-        } else if would_sign {
-            println!("Would sign commit with -S flag");
-        } else {
-            println!("Would create unsigned commit (GPG signing not available)");
-            if !gpg_available {
-                println!("⚠️  Warning: GPG signing not available or not configured.");
-                println!("   To suppress this warning, use the --unsigned (-u) flag.");
-            }
-        }
-
-        if !filtered_args.is_empty() {
-            println!("With additional args: {filtered_args:?}");
-        }
-
+        handle_dry_run_output(&file_content, unsigned, &filtered_args);
         return Ok(());
     }
 
     let mut command = Command::new("git");
     command.arg("commit");
 
-    // Add -S flag for signed commits if GPG is available and signing is not explicitly disabled
-    let gpg_available = is_gpg_signing_available();
-    let should_sign = !unsigned && gpg_available;
-
-    if should_sign {
-        command.arg("-S");
-    } else if !unsigned && !gpg_available {
-        // Warn user when GPG signing is not available and they haven't explicitly requested unsigned
-        println!(
-            "⚠️  Warning: GPG signing not available or not configured. Creating unsigned commit."
-        );
-        println!("   To suppress this warning, use the --unsigned (-u) flag.");
-    } else if verbose && !unsigned {
-        println!("GPG signing not available, creating unsigned commit");
-    }
+    // Configure signing and get signing status
+    configure_commit_signing(&mut command, unsigned, verbose);
 
     command.arg("-m").arg(file_content).args(&filtered_args);
 
     let output = command.output()?;
-
     handle_output("commit", &output, verbose)
 }
 
@@ -393,45 +414,8 @@ fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
     Ok(false)
 }
 
-/// Handles the output of git commands, providing consistent error handling and success messaging.
-///
-/// This function processes the output of git commands and:
-/// - Prints success messages when verbose mode is enabled
-/// - Displays command output if present
-/// - Formats and prints error messages with suggestions when commands fail
-///
-/// # Arguments
-/// * `method_name` - The name of the git command being executed (e.g., "commit", "push")
-/// * `output` - The `Output` struct containing the command's stdout, stderr, and status
-/// * `verbose` - Whether to print verbose output during the operation
-///
-/// # Returns
-/// * `Result<()>` - `Ok(())` if the command succeeded, `Err(RonaError)` if it failed
-#[doc(hidden)]
-fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()> {
-    use crate::errors::pretty_print_error;
-
-    if output.status.success() {
-        if verbose {
-            println!("{method_name} successful!");
-        }
-
-        if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout).trim());
-        }
-
-        Ok(())
-    } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-
-        println!("\n🚨 Git {method_name} failed:");
-        pretty_print_error(&error_message);
-
-        Err(RonaError::Io(std::io::Error::other(format!(
-            "Git {method_name} failed"
-        ))))
-    }
-}
+// Use the shared handle_output function from the parent module
+use super::handle_output;
 
 #[cfg(test)]
 mod tests {

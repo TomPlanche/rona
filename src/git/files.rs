@@ -10,7 +10,7 @@ use std::{
     path::Path,
 };
 
-use regex::Regex;
+// Regex is now used through the shared extract_filenames function
 
 use crate::{
     errors::Result,
@@ -160,38 +160,5 @@ pub fn process_gitignore_file() -> Result<Vec<String>> {
     extract_filenames(&git_ignore_file_contents, r"^([^#]\S*)$")
 }
 
-/// Extracts filenames from a git status message using a regex pattern.
-///
-/// # Errors
-/// * If the regex pattern is invalid
-/// * If the filename cannot be captured from a line
-///
-/// # Returns
-/// * `Result<Vec<String>>` - The extracted filenames or an error message
-#[doc(hidden)]
-fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
-    use crate::errors::{GitError, RonaError};
-
-    let regex = Regex::new(pattern).map_err(|e| {
-        RonaError::Git(GitError::InvalidStatus {
-            output: format!("Failed to compile regex pattern: {e}"),
-        })
-    })?;
-
-    let mut result = Vec::new();
-    for line in message.lines() {
-        if regex.is_match(line) {
-            if let Some(captures) = regex.captures(line) {
-                // If we have a second capture group (renamed file), use that
-                // Otherwise use the first capture group
-                if let Some(new_name) = captures.get(2) {
-                    result.push(new_name.as_str().to_string());
-                } else if let Some(file_name) = captures.get(1) {
-                    result.push(file_name.as_str().to_string());
-                }
-            }
-        }
-    }
-
-    Ok(result)
-}
+// Use the shared extract_filenames function from the parent module
+use super::extract_filenames;
