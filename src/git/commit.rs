@@ -78,11 +78,84 @@ pub fn get_current_commit_nb() -> Result<u32> {
     }
 }
 
+/// Detects if GPG signing is available and properly configured.
+///
+/// This function checks multiple conditions to determine if GPG signing can be used:
+/// 1. Whether a GPG signing key is configured in git
+/// 2. Whether GPG is available on the system
+/// 3. Whether the configured key (if any) exists in the GPG keyring
+///
+/// # Returns
+/// * `true` if GPG signing is available and configured properly
+/// * `false` if GPG signing is not available or not configured
+///
+/// # Panics
+/// This function does not panic. All command executions are handled with proper error checking.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rona::git::commit::is_gpg_signing_available;
+///
+/// if is_gpg_signing_available() {
+///     println!("GPG signing is available");
+/// } else {
+///     println!("GPG signing is not available, will create unsigned commit");
+/// }
+/// ```
+#[must_use]
+pub fn is_gpg_signing_available() -> bool {
+    // Check if git has a signing key configured
+    let git_signing_key = Command::new("git")
+        .args(["config", "--get", "user.signingkey"])
+        .output();
+
+    if let Ok(output) = git_signing_key {
+        if !output.status.success() || output.stdout.is_empty() {
+            // No signing key configured
+            return false;
+        }
+
+        let signing_key = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        // Check if GPG is available and the key exists
+        let gpg_check = Command::new("gpg")
+            .args(["--list-secret-keys", &signing_key])
+            .output();
+
+        if let Ok(gpg_output) = gpg_check {
+            return gpg_output.status.success();
+        }
+    }
+
+    // As a fallback, check if gpg.program is configured and accessible
+    let git_gpg_program = Command::new("git")
+        .args(["config", "--get", "gpg.program"])
+        .output();
+
+    if let Ok(output) = git_gpg_program {
+        if output.status.success() && !output.stdout.is_empty() {
+            let gpg_program = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            // Test if the configured GPG program is available
+            if let Ok(test_gpg) = Command::new(gpg_program).arg("--version").output() {
+                return test_gpg.status.success();
+            }
+        }
+    }
+
+    // Final fallback: check if default 'gpg' command is available
+    if let Ok(default_gpg) = Command::new("gpg").arg("--version").output() {
+        default_gpg.status.success()
+    } else {
+        false
+    }
+}
+
 /// Commits files to the git repository.
 ///
 /// This function reads the commit message from `commit_message.md` and creates
 /// a git commit with that message. Additional git arguments can be passed through.
-/// By default, commits are signed with `-S` unless the unsigned flag is set.
+/// By default, commits are signed with `-S` if GPG signing is available, unless the unsigned flag is set.
 ///
 /// # Arguments
 /// * `args` - Additional arguments to pass to the git commit command
@@ -101,7 +174,7 @@ pub fn get_current_commit_nb() -> Result<u32> {
 /// ```no_run
 /// use rona::git::commit::git_commit;
 ///
-/// // Basic signed commit (default)
+/// // Commit with automatic GPG detection (default)
 /// git_commit(&[], false, false, false)?;
 ///
 /// // Unsigned commit
@@ -145,10 +218,19 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
         println!("{}", file_content.trim());
         println!("---");
 
+        let gpg_available = is_gpg_signing_available();
+        let would_sign = !unsigned && gpg_available;
+
         if unsigned {
             println!("Would create unsigned commit");
-        } else {
+        } else if would_sign {
             println!("Would sign commit with -S flag");
+        } else {
+            println!("Would create unsigned commit (GPG signing not available)");
+            if !gpg_available {
+                println!("⚠️  Warning: GPG signing not available or not configured.");
+                println!("   To suppress this warning, use the --unsigned (-u) flag.");
+            }
         }
 
         if !filtered_args.is_empty() {
@@ -161,9 +243,20 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
     let mut command = Command::new("git");
     command.arg("commit");
 
-    // Add -S flag for signed commits by default, unless unsigned is requested
-    if !unsigned {
+    // Add -S flag for signed commits if GPG is available and signing is not explicitly disabled
+    let gpg_available = is_gpg_signing_available();
+    let should_sign = !unsigned && gpg_available;
+
+    if should_sign {
         command.arg("-S");
+    } else if !unsigned && !gpg_available {
+        // Warn user when GPG signing is not available and they haven't explicitly requested unsigned
+        println!(
+            "⚠️  Warning: GPG signing not available or not configured. Creating unsigned commit."
+        );
+        println!("   To suppress this warning, use the --unsigned (-u) flag.");
+    } else if verbose && !unsigned {
+        println!("GPG signing not available, creating unsigned commit");
     }
 
     command.arg("-m").arg(file_content).args(&filtered_args);
@@ -337,5 +430,52 @@ fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()
         Err(RonaError::Io(std::io::Error::other(format!(
             "Git {method_name} failed"
         ))))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gpg_signing_available() {
+        // This test verifies that the GPG detection function doesn't panic
+        // The actual result depends on the system's GPG configuration
+        let _result = is_gpg_signing_available();
+        // We don't assert on the result since it depends on system configuration
+        // but we verify the function executes without errors
+    }
+
+    #[test]
+    fn test_git_commit_dry_run_with_unsigned() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+
+        // Initialize git repository
+        std::process::Command::new("git")
+            .current_dir(temp_path)
+            .arg("init")
+            .output()
+            .unwrap();
+
+        // Create commit message file
+        let commit_msg = "[1] (test on main)\n\n- `test.txt`:\n\n\t\n";
+        fs::write(temp_path.join("commit_message.md"), commit_msg).unwrap();
+
+        // Change to temp directory
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(temp_path).unwrap();
+
+        // Test dry run with unsigned flag - should not show warning
+        let result = git_commit(&[], true, false, true);
+
+        // Restore original directory
+        std::env::set_current_dir(original_dir).unwrap();
+
+        // Should succeed without errors
+        assert!(result.is_ok());
     }
 }
