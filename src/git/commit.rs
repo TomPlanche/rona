@@ -16,7 +16,10 @@ use crate::{
     utils::find_project_root,
 };
 
-use super::{files::get_ignore_patterns, status::{process_deleted_files_for_commit_message, process_git_status, read_git_status}};
+use super::{
+    files::get_ignore_patterns,
+    status::{process_deleted_files_for_commit_message, process_git_status, read_git_status},
+};
 
 pub const COMMIT_MESSAGE_FILE_PATH: &str = "commit_message.md";
 pub const COMMIT_TYPES: [&str; 4] = ["chore", "feat", "fix", "test"];
@@ -122,7 +125,9 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
     let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
 
     if !commit_file_path.exists() {
-        return Err(RonaError::Io(std::io::Error::other("Commit message file not found")));
+        return Err(RonaError::Io(std::io::Error::other(
+            "Commit message file not found",
+        )));
     }
 
     let file_content = read_to_string(commit_file_path)?;
@@ -155,17 +160,14 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
 
     let mut command = Command::new("git");
     command.arg("commit");
-    
+
     // Add -S flag for signed commits by default, unless unsigned is requested
     if !unsigned {
         command.arg("-S");
     }
-    
-    command
-        .arg("-m")
-        .arg(file_content)
-        .args(&filtered_args);
-        
+
+    command.arg("-m").arg(file_content).args(&filtered_args);
+
     let output = command.output()?;
 
     handle_output("commit", &output, verbose)
@@ -278,7 +280,7 @@ fn write_commit_header(
 /// * `true` if the file should be ignored, `false` otherwise
 fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
     use crate::utils::check_for_file_in_folder;
-    
+
     // Check if the file is directly in the ignore list
     if ignore_patterns.contains(&file.to_string()) {
         return Ok(true);
@@ -315,7 +317,7 @@ fn should_ignore_file(file: &str, ignore_patterns: &[String]) -> Result<bool> {
 #[doc(hidden)]
 fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()> {
     use crate::errors::pretty_print_error;
-    
+
     if output.status.success() {
         if verbose {
             println!("{method_name} successful!");
@@ -336,4 +338,4 @@ fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()
             "Git {method_name} failed"
         ))))
     }
-} 
+}

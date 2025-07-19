@@ -117,4 +117,4 @@ pub fn format_branch_name(commit_types: &[&str; 4], branch: &str) -> String {
     }
 
     formatted_branch
-} 
+}

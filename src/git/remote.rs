@@ -74,8 +74,8 @@ pub fn git_push(args: &[String], verbose: bool, dry_run: bool) -> Result<()> {
 /// * `Result<()>` - `Ok(())` if the command succeeded, `Err(RonaError)` if it failed
 #[doc(hidden)]
 fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()> {
-    use crate::errors::{pretty_print_error, RonaError};
-    
+    use crate::errors::{RonaError, pretty_print_error};
+
     if output.status.success() {
         if verbose {
             println!("{method_name} successful!");
@@ -96,4 +96,4 @@ fn handle_output(method_name: &str, output: &Output, verbose: bool) -> Result<()
             "Git {method_name} failed"
         ))))
     }
-} 
+}

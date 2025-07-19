@@ -169,4 +169,4 @@ fn print_dry_run_summary(
 
     let excluded_files_len = staged_files_len - files_to_add.len();
     println!("Would exclude {excluded_files_len} files");
-} 
+}
