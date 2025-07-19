@@ -25,6 +25,7 @@
 //! - Handles configuration management
 //!
 
+use crate::git::{format_branch_name, get_current_branch, get_current_commit_nb};
 use crate::{
     config::Config,
     errors::Result,
@@ -39,7 +40,6 @@ use clap_complete::{Shell, generate};
 use dialoguer::Select;
 use glob::Pattern;
 use std::{io, process::Command};
-use crate::git::{format_branch_name, get_current_branch, get_current_commit_nb};
 
 /// CLI's commands
 #[derive(Subcommand)]
@@ -296,10 +296,7 @@ fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<
         return Ok(());
     }
 
-    let branch_name = format_branch_name(
-        &COMMIT_TYPES,
-        &get_current_branch()?,
-    );
+    let branch_name = format_branch_name(&COMMIT_TYPES, &get_current_branch()?);
 
     let formatted_message = if no_commit_number {
         format!("({} on {}) {}", commit_type, branch_name, message.trim())

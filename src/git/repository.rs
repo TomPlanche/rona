@@ -89,4 +89,4 @@ pub fn get_top_level_path() -> Result<PathBuf> {
     let git_top_level_path = PathBuf::from(stdout.trim());
 
     Ok(git_top_level_path)
-} 
+}

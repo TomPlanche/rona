@@ -183,4 +183,4 @@ fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
     }
 
     Ok(result)
-} 
+}
