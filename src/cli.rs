@@ -283,7 +283,7 @@ fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<
     use dialoguer::Input;
     use std::fs;
 
-    println!("\n📝 Interactive mode: Enter your commit message.");
+    println!("📝 Interactive mode: Enter your commit message.");
     println!("💡 Tip: Keep it concise and descriptive.");
 
     let message: String = Input::with_theme(&my_clap_theme::ColorfulTheme::default())

@@ -6,6 +6,7 @@
 use std::process::Command;
 
 use crate::errors::{GitError, Result, RonaError};
+use crate::git::commit::get_current_commit_nb;
 
 /// Gets the current branch name.
 ///
@@ -46,11 +47,65 @@ pub fn get_current_branch() -> Result<String> {
         let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(branch)
     } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-        Err(RonaError::Git(GitError::CommandFailed {
-            command: "git rev-parse --abbrev-ref HEAD".to_string(),
-            output: error_message.to_string(),
-        }))
+        // Check if it's a freshly initialized repository (no commits yet)
+        // If get_current_commit_nb() fails, it's likely a fresh repo with no HEAD
+        match get_current_commit_nb() {
+            Ok(0) => {
+                // Fresh repository with no commits
+                // Try to get the default branch name
+                let config_output = Command::new("git")
+                    .args(["config", "--get", "init.defaultBranch"])
+                    .output()?;
+
+                if config_output.status.success() {
+                    let default_branch = String::from_utf8_lossy(&config_output.stdout)
+                        .trim()
+                        .to_string();
+
+                    Ok(default_branch)
+                } else {
+                    // No default branch configured, fall back to original error
+                    let error_message = String::from_utf8_lossy(&output.stderr);
+
+                    Err(RonaError::Git(GitError::CommandFailed {
+                        command: "git config --get init.defaultBranch".to_string(),
+                        output: error_message.to_string(),
+                    }))
+                }
+            }
+            Ok(_) => {
+                // Repository has commits, so the original error wasn't due to fresh repo
+                let error_message = String::from_utf8_lossy(&output.stderr);
+
+                Err(RonaError::Git(GitError::CommandFailed {
+                    command: "git rev-parse --abbrev-ref HEAD".to_string(),
+                    output: error_message.to_string(),
+                }))
+            }
+            Err(_) => {
+                // Can't determine commit count, likely a fresh repo with no HEAD
+                // Try to get the default branch name
+                let config_output = Command::new("git")
+                    .args(["config", "--get", "init.defaultBranch"])
+                    .output()?;
+
+                if config_output.status.success() {
+                    let default_branch = String::from_utf8_lossy(&config_output.stdout)
+                        .trim()
+                        .to_string();
+
+                    Ok(default_branch)
+                } else {
+                    // Return original error from rev-parse
+                    let error_message = String::from_utf8_lossy(&output.stderr);
+
+                    Err(RonaError::Git(GitError::CommandFailed {
+                        command: "git rev-parse --abbrev-ref HEAD".to_string(),
+                        output: error_message.to_string(),
+                    }))
+                }
+            }
+        }
     }
 }
 
