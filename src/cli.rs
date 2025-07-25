@@ -262,11 +262,17 @@ fn handle_generate(interactive: bool, no_commit_number: bool, config: &Config) -
 
     create_needed_files()?;
 
-    let commit_type = COMMIT_TYPES[Select::with_theme(&my_clap_theme::ColorfulTheme::default())
-        .default(0)
-        .items(&COMMIT_TYPES)
-        .interact()
-        .unwrap()];
+    let commit_types_vec = config.project_config.commit_types.as_ref().map_or_else(
+        || COMMIT_TYPES.to_vec(),
+        |v| v.iter().map(String::as_str).collect::<Vec<&str>>(),
+    );
+
+    let commit_type = commit_types_vec
+        [Select::with_theme(&my_clap_theme::ColorfulTheme::default())
+            .default(0)
+            .items(&commit_types_vec)
+            .interact()
+            .unwrap()];
 
     generate_commit_message(commit_type, config.verbose, no_commit_number)?;
 

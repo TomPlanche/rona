@@ -21,16 +21,89 @@
 //! - Invalid configuration format
 //! - Home directory not found
 
-use regex::Regex;
-use std::{env, fs, path::PathBuf};
+use std::{env, path::PathBuf};
 
 use crate::{
     errors::{ConfigError, GitError, Result},
     utils::print_error,
 };
 
-// Make this public so tests can use it directly
-pub const CONFIG_FOLDER_NAME: &str = "rona-test-config";
+use crate::my_clap_theme;
+use crate::utils::find_project_root;
+use config as config_crate;
+use dialoguer::Select;
+use serde::{Deserialize, Serialize};
+
+// Define your default commit types
+const DEFAULT_COMMIT_TYPES: &[&str] = &["feat", "fix", "docs", "test", "chore"];
+
+/// Project-specific configuration that can be defined in rona.toml
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProjectConfig {
+    /// Editor command to use for commit messages
+    pub editor: Option<String>,
+
+    /// Custom commit types for this project
+    pub commit_types: Option<Vec<String>>,
+}
+
+impl Default for ProjectConfig {
+    fn default() -> Self {
+        Self {
+            editor: Some("nano".to_string()),
+            commit_types: Some(
+                DEFAULT_COMMIT_TYPES
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl ProjectConfig {
+    /// Loads the project configuration, merging global and project config files.
+    ///
+    /// # Errors
+    /// Returns `ConfigError::ConfigNotFound` if the config files cannot be found or read.
+    /// Returns `ConfigError::InvalidConfig` if deserialization fails.
+    ///
+    /// # Panics
+    /// Panics if the current working directory cannot be determined (i.e., if `std::env::current_dir()` fails).
+    pub fn load() -> Result<Self> {
+        let mut builder = config_crate::Config::builder();
+
+        // Support both old and new global config paths
+        let home = dirs::home_dir().ok_or(ConfigError::ConfigNotFound)?;
+        let old_global = home.join(".config/rona/config.toml");
+        let new_global = home.join(".config/rona.toml");
+        if old_global.exists() {
+            builder =
+                builder.add_source(config_crate::File::from(old_global.clone()).required(false));
+        }
+        if new_global.exists() {
+            builder =
+                builder.add_source(config_crate::File::from(new_global.clone()).required(false));
+        }
+
+        // Add project config if it exists
+        let project_config_path = env::current_dir()?.join(".rona.toml");
+        if project_config_path.exists() {
+            builder = builder
+                .add_source(config_crate::File::from(project_config_path.clone()).required(false));
+        }
+
+        // Build the config
+        let settings = builder.build().map_err(|_| ConfigError::ConfigNotFound)?;
+        match settings.try_deserialize() {
+            Ok(config) => Ok(config),
+            Err(e) => {
+                eprintln!("Failed to deserialize config: {e}");
+                Err(ConfigError::InvalidConfig.into())
+            }
+        }
+    }
+}
 
 /// Main configuration struct that handles all config operations.
 /// This includes both persistent configuration (stored in config file)
@@ -44,6 +117,7 @@ pub struct Config {
     root: PathBuf,
     pub(crate) verbose: bool,
     pub(crate) dry_run: bool,
+    pub project_config: ProjectConfig,
 }
 
 impl Config {
@@ -57,12 +131,13 @@ impl Config {
     /// * `Result<Config>` - A new Config instance with default settings
     pub fn new() -> Result<Self> {
         let root = Config::get_config_root()?;
+        let project_config = ProjectConfig::load()?;
         let config = Config {
             root,
             verbose: false,
             dry_run: false,
+            project_config,
         };
-
         Ok(config)
     }
 
@@ -75,10 +150,14 @@ impl Config {
     /// # Returns
     /// * `Config` - A new Config instance with the specified root and default settings
     pub fn with_root(root: impl Into<PathBuf>) -> Self {
+        let root = root.into();
+        let project_config = ProjectConfig::load().unwrap_or_default();
+
         Config {
-            root: root.into(),
+            root,
             verbose: false,
             dry_run: false,
+            project_config,
         }
     }
 
@@ -102,38 +181,15 @@ impl Config {
     /// Retrieves the editor from the configuration file.
     ///
     /// # Errors
-    /// * If the configuration file cannot be read
-    /// * If the configuration file does not exist
-    /// * If the regex pattern fails to compile
     /// * If the editor setting is missing or invalid
     ///
     /// # Returns
     /// * `Result<String>` - The configured editor command
     pub fn get_editor(&self) -> Result<String> {
-        let config_file = self.get_config_file_path()?;
-
-        if !config_file.exists() {
-            if !cfg!(test) {
-                print_error(
-                    "Configuration file not found",
-                    "Please create a configuration file",
-                    "Use the `rona init [editor]` to create a configuration file",
-                );
-            }
-
-            return Err(ConfigError::ConfigNotFound.into());
-        }
-
-        let config_content = fs::read_to_string(&config_file)?;
-        let regex = Config::get_regex_editor()?;
-
-        let editor = regex
-            .captures(config_content.trim())
-            .and_then(|captures| captures.get(1))
-            .map(|match_| match_.as_str().to_string())
-            .ok_or(ConfigError::InvalidConfig)?;
-
-        Ok(editor.trim().to_string())
+        self.project_config
+            .editor
+            .clone()
+            .ok_or(ConfigError::InvalidConfig.into())
     }
 
     /// Sets the editor in the configuration file.
@@ -144,31 +200,35 @@ impl Config {
     /// # Errors
     /// * If the configuration file cannot be read or written
     /// * If the configuration file does not exist
-    /// * If the regex pattern fails to compile
     pub fn set_editor(&self, editor: &str) -> Result<()> {
-        let config_file = self.get_config_file_path()?;
+        use dialoguer::Select;
+        use std::io::Write;
+        let options = ["Project (./.rona.toml)", "Global (~/.config/rona.toml)"];
 
-        if !config_file.exists() {
-            if !cfg!(test) {
-                print_error(
-                    "Configuration file not found",
-                    "Please create a configuration file first",
-                    "Use the `rona init [editor]` command to create a new configuration file",
-                );
+        let selection = Select::with_theme(&my_clap_theme::ColorfulTheme::default())
+            .with_prompt("Where do you want to set the editor?")
+            .items(&options)
+            .default(0)
+            .interact()
+            .map_err(|_| ConfigError::InvalidConfig)?;
+
+        let config_path = match selection {
+            0 => find_project_root()
+                .map(|root| root.join(".rona.toml"))
+                .map_err(|_| ConfigError::ConfigNotFound)?,
+            1 => {
+                let home = dirs::home_dir().ok_or(ConfigError::ConfigNotFound)?;
+                home.join(".config/rona.toml")
             }
+            _ => unreachable!(),
+        };
 
-            return Err(ConfigError::ConfigNotFound.into());
-        }
-
-        let config_content = fs::read_to_string(&config_file)?;
-        let regex = Config::get_regex_editor()?;
-
-        let new_config_content = regex
-            .replace(&config_content, &format!("editor = \"{editor}\""))
-            .to_string();
-
-        fs::write(&config_file, new_config_content)?;
-
+        let mut config = self.project_config.clone();
+        config.editor = Some(editor.to_string());
+        let toml_str = toml::to_string_pretty(&config).map_err(|_| ConfigError::InvalidConfig)?;
+        let mut file = std::fs::File::create(&config_path)?;
+        file.write_all(toml_str.as_bytes())?;
+        println!("Editor set in: {}", config_path.display());
         Ok(())
     }
 
@@ -182,31 +242,47 @@ impl Config {
     /// * If writing the configuration file fails
     /// * If the configuration file already exists
     pub fn create_config_file(&self, editor: &str) -> Result<()> {
-        let config_folder = self.get_config_folder_path()?;
+        let options = ["Project (.rona.toml)", "Global (~/.config/rona.toml)"];
+        let selection = Select::with_theme(&my_clap_theme::ColorfulTheme::default())
+            .with_prompt("Where do you want to initialize the config?")
+            .items(&options)
+            .default(0)
+            .interact()
+            .map_err(|_| ConfigError::InvalidConfig)?;
 
+        let config_path = match selection {
+            0 => env::current_dir()?.join(".rona.toml"),
+            1 => {
+                let home = dirs::home_dir().ok_or(ConfigError::ConfigNotFound)?;
+                home.join(".config/rona.toml")
+            }
+            _ => unreachable!(),
+        };
+
+        let config_folder = config_path.parent().ok_or(ConfigError::ConfigNotFound)?;
         if !config_folder.exists() {
-            fs::create_dir_all(config_folder)?;
+            std::fs::create_dir_all(config_folder)?;
         }
 
-        let config_file = self.get_config_file_path()?;
-        let config_content = format!("editor = \"{editor}\"");
-
-        if config_file.exists() {
+        if config_path.exists() {
             if !cfg!(test) {
                 print_error(
                     "Configuration file already exists.",
                     &format!(
                         "A configuration file already exists at {}",
-                        config_file.display()
+                        config_path.display()
                     ),
                     "Use `rona --set-editor <editor>` (or `rona -s <editor>`) to change it.",
                 );
             }
-
             return Err(ConfigError::ConfigAlreadyExists.into());
         }
 
-        fs::write(&config_file, config_content)?;
+        let mut config = self.project_config.clone();
+        config.editor = Some(editor.to_string());
+
+        let toml_str = toml::to_string_pretty(&config).map_err(|_| ConfigError::InvalidConfig)?;
+        std::fs::write(&config_path, toml_str)?;
 
         Ok(())
     }
@@ -257,18 +333,10 @@ impl Config {
             Ok(PathBuf::from(root.unwrap()))
         }
     }
-
-    /// Returns the regex pattern used to match the editor setting in the config file.
-    ///
-    /// # Errors
-    /// * If the regex pattern fails to compile
-    ///
-    /// # Returns
-    /// * `Result<Regex>` - The compiled regex pattern
-    fn get_regex_editor() -> Result<Regex> {
-        Regex::new(r#"editor\s*=\s*"(.*?)""#).map_err(|e| ConfigError::RegexError(e).into())
-    }
 }
+
+// Make this public so tests can use it directly
+pub const CONFIG_FOLDER_NAME: &str = "rona-test-config";
 
 #[cfg(test)]
 mod tests {
@@ -290,7 +358,7 @@ mod tests {
         let config_file = config.get_config_file_path().unwrap();
         assert!(config_file.exists());
 
-        let content = fs::read_to_string(&config_file).unwrap();
+        let content = std::fs::read_to_string(&config_file).unwrap();
         assert_eq!(content, format!("editor = \"{editor}\""));
 
         // Test error when a file already exists
@@ -339,7 +407,7 @@ mod tests {
         // Don't create a config file, verify we get an error
         assert!(matches!(
             config.get_editor(),
-            Err(RonaError::Config(ConfigError::ConfigNotFound))
+            Err(RonaError::Config(ConfigError::InvalidConfig))
         ));
     }
 
@@ -362,11 +430,11 @@ mod tests {
 
         // Create a config directory
         let config_folder = config.get_config_folder_path().unwrap();
-        fs::create_dir_all(&config_folder).unwrap();
+        std::fs::create_dir_all(&config_folder).unwrap();
 
         // Create a malformed config file
         let config_file = config.get_config_file_path().unwrap();
-        fs::write(&config_file, "editor = missing_quotes").unwrap();
+        std::fs::write(&config_file, "editor = missing_quotes").unwrap();
 
         // Test that get_editor returns an error
         assert!(matches!(
