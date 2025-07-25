@@ -70,11 +70,31 @@ pub fn get_current_commit_nb() -> Result<u32> {
 
         Ok(commit_count)
     } else {
-        let error_message = String::from_utf8_lossy(&output.stderr);
-        Err(RonaError::Git(GitError::CommandFailed {
-            command: "git rev-list --count HEAD".to_string(),
-            output: error_message.to_string(),
-        }))
+        // HEAD might not exist in a freshly initialized repository
+        // Try counting all commits across all branches
+        let fallback_output = Command::new("git")
+            .args(["rev-list", "--count", "--all"])
+            .output()?;
+
+        if fallback_output.status.success() {
+            let commit_count_output = String::from_utf8_lossy(&fallback_output.stdout);
+            let commit_count_str = commit_count_output.trim();
+            let commit_count = commit_count_str.parse::<u32>().map_err(|_| {
+                RonaError::Git(GitError::InvalidStatus {
+                    output: format!("Invalid commit count: {commit_count_str}"),
+                })
+            })?;
+
+            Ok(commit_count)
+        } else {
+            // Return original error from the HEAD command
+            let error_message = String::from_utf8_lossy(&output.stderr);
+
+            Err(RonaError::Git(GitError::CommandFailed {
+                command: "git rev-list --count HEAD".to_string(),
+                output: error_message.to_string(),
+            }))
+        }
     }
 }
 
