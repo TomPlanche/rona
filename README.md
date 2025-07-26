@@ -22,14 +22,61 @@ Rona is a command-line interface tool designed to enhance your Git workflow with
 - 🚀 Intelligent file staging with pattern exclusion
 - 📝 Structured commit message generation
 - 🔄 Streamlined push operations
-- 🎯 Interactive commit type selection
+- 🎯 Interactive commit type selection with customizable types
 - 🛠 Multi-shell completion support (Bash, Fish, Zsh, PowerShell)
+- ⚙️ Flexible configuration system (global and project-level)
 
 ## Installation
 
 ```bash
 cargo install rona
-rona init [editor] # The editor to use for commit messages [vim, zed] (default: nano)
+rona init [editor] # The editor to use for commit messages (default: nano)
+```
+
+## Configuration
+
+Rona supports flexible configuration through TOML files:
+
+- **Global config**: `~/.config/rona.toml` - applies to all projects
+- **Project config**: `./.rona.toml` - applies only to the current project (overrides global)
+
+### Configuration Options
+
+```toml
+# Editor for commit messages (any command-line editor)
+editor = "nano"  # Examples: "vim", "zed", "code --wait", "emacs"
+
+# Custom commit types (defaults shown below)
+commit_types = [
+    "feat",    # New features
+    "fix",     # Bug fixes  
+    "docs",    # Documentation changes
+    "test",    # Adding or updating tests
+    "chore"    # Maintenance tasks
+]
+```
+
+**Note**: When no configuration exists, Rona falls back to: `["chore", "feat", "fix", "test"]`
+
+### Working with Configuration
+
+```bash
+# Initialize global configuration
+rona init vim                    # Creates ~/.config/rona.toml
+
+# Initialize project-specific configuration  
+cd my-project
+rona init zed                    # Creates ./.rona.toml (overrides global)
+
+# Change editor later
+rona set-editor "code --wait"    # Choose global or project scope interactively
+
+# View current configuration
+cat .rona.toml                   # Project config
+cat ~/.config/rona.toml          # Global config
+
+# Customize commit types for your project
+echo 'commit_types = ["feat", "fix", "refactor", "style", "docs"]' >> .rona.toml
 ```
 
 ## Usage Examples
@@ -38,11 +85,11 @@ rona init [editor] # The editor to use for commit messages [vim, zed] (default: 
 
 1. Initialize Rona with your preferred editor:
 ```bash
-# Initialize with Vim
+# Initialize with various editors
 rona init vim
-
-# Initialize with Zed
-rona init zed
+rona init zed  
+rona init "code --wait"  # VS Code
+rona init emacs
 
 # Initialize with default editor (nano)
 rona init
@@ -284,18 +331,31 @@ rona -g -i
 
 **Interactive Mode Usage:**
 When using the `-i` flag, Rona will:
-1. Show the commit type selector (chore, feat, fix, test)
+1. Show the commit type selector (uses configured types or defaults: feat, fix, docs, test, chore)
 2. Prompt for a single commit message input
 3. Generate a clean format: `[commit_nb] (type on branch) message`
 4. Save directly to `commit_message.md` without file details
 
 This is perfect for quick, clean commits without the detailed file listing.
 
+**Commit Types:**
+- Uses commit types from your configuration (`.rona.toml` or `~/.config/rona.toml`)
+- Falls back to: `["chore", "feat", "fix", "test"]` when no configuration exists
+- Default configuration includes: `["feat", "fix", "docs", "test", "chore"]`
+
 ### `init` (`-i`)
 Initialize Rona configuration.
 
 ```bash
-rona init [editor] # The editor to use for commit messages [vim, zed] (default: nano)
+rona init [editor] # Any command-line editor (default: nano)
+```
+
+**Examples:**
+```bash
+rona init vim
+rona init zed  
+rona init "code --wait"  # VS Code
+rona init                # Uses default (nano)
 ```
 
 ### `list-status` (`-l`)
@@ -320,7 +380,16 @@ rona -p [extra args]
 Set the default editor for commit messages.
 
 ```bash
-rona set-editor <editor> # The editor to use for commit messages [vim, zed], no default here
+rona set-editor <editor> # Any command-line editor (vim, zed, "code --wait", etc.)
+```
+
+**Examples:**
+```bash
+rona set-editor vim
+rona set-editor zed
+rona set-editor "code --wait"  # VS Code
+rona set-editor emacs
+rona set-editor nano
 ```
 
 ### `help` (`-h`)
