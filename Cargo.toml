@@ -24,7 +24,7 @@ name = "rona"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5.41", features = ["derive"] }
+clap = { version = "4.5.42", features = ["derive"] }
 clap_complete = "4.5.55"
 console = "0.15.11"
 dialoguer = "0.11.0"
