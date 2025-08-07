@@ -153,13 +153,14 @@ pub fn is_gpg_signing_available() -> bool {
         .args(["config", "--get", "gpg.program"])
         .output();
 
-    if let Ok(output) = git_gpg_program {
-        if output.status.success() && !output.stdout.is_empty() {
-            let gpg_program = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            // Test if the configured GPG program is available
-            if let Ok(test_gpg) = Command::new(gpg_program).arg("--version").output() {
-                return test_gpg.status.success();
-            }
+    if let Ok(output) = git_gpg_program
+        && output.status.success()
+        && !output.stdout.is_empty()
+    {
+        let gpg_program = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        // Test if the configured GPG program is available
+        if let Ok(test_gpg) = Command::new(gpg_program).arg("--version").output() {
+            return test_gpg.status.success();
         }
     }
 
