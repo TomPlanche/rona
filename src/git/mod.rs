@@ -29,7 +29,7 @@ pub mod status;
 pub use branch::{format_branch_name, get_current_branch};
 pub use commit::{
     COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, generate_commit_message, get_current_commit_nb,
-    git_commit, is_gpg_signing_available,
+    git_commit,
 };
 pub use files::create_needed_files;
 pub use remote::git_push;
@@ -102,15 +102,15 @@ pub fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
 
     let mut result = Vec::new();
     for line in message.lines() {
-        if regex.is_match(line) {
-            if let Some(captures) = regex.captures(line) {
-                // If we have a second capture group (renamed file), use that
-                // Otherwise use the first capture group
-                if let Some(new_name) = captures.get(2) {
-                    result.push(new_name.as_str().to_string());
-                } else if let Some(file_name) = captures.get(1) {
-                    result.push(file_name.as_str().to_string());
-                }
+        if regex.is_match(line)
+            && let Some(captures) = regex.captures(line)
+        {
+            // If we have a second capture group (renamed file), use that
+            // Otherwise use the first capture group
+            if let Some(new_name) = captures.get(2) {
+                result.push(new_name.as_str().to_string());
+            } else if let Some(file_name) = captures.get(1) {
+                result.push(file_name.as_str().to_string());
             }
         }
     }
