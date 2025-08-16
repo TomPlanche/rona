@@ -42,4 +42,4 @@ mockall = "0.13.1"
 tempfile = "3.20.0"
 
 [build-dependencies]
-hooksmith = "1.12.2"
+hooksmith = "1.13.0"
