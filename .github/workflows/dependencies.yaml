@@ -50,9 +50,9 @@ jobs:
             - Updated all dependencies to their latest versions
             - Please review the changes before merging
           branch: update-dependencies
-          commit-message: "chore: update dependencies"
+          commit-message: "(chore on update-dependencies) update dependencies"
           labels: |
             dependencies
             automated pr
-          title: "(chore on main) update dependencies"
+          title: "[chore] update dependencies"
           token: ${{ secrets.GITHUB_TOKEN }}
