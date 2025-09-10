@@ -25,6 +25,7 @@ Rona is a command-line interface tool designed to enhance your Git workflow with
 - 🎯 Interactive commit type selection with customizable types
 - 🛠 Multi-shell completion support (Bash, Fish, Zsh, PowerShell)
 - ⚙️ Flexible configuration system (global and project-level)
+ - 🎨 Colored interactive prompts powered by Inquire
 
 ## Installation
 
@@ -337,6 +338,20 @@ When using the `-i` flag, Rona will:
 4. Save directly to `commit_message.md` without file details
 
 This is perfect for quick, clean commits without the detailed file listing.
+
+### Prompt UI and Colors
+
+Rona uses the `inquire` crate for interactive prompts with a custom color scheme applied globally:
+
+- Prompt prefix: `$` (light red)
+- Answered prefix: `✔` (light green)
+- Highlighted option prefix: `➠` (light blue)
+- Prompt label: light cyan + bold
+- Help message: dark yellow + italic
+- Answer text: light magenta + bold
+- Default values: light blue; placeholders: black
+
+If you prefer different colors, you can fork and adjust the render configuration in `src/cli.rs` (function `get_render_config`). You can also override styles for a specific prompt using `with_render_config(...)` on that prompt.
 
 **Commit Types:**
 - Uses commit types from your configuration (`.rona.toml` or `~/.config/rona.toml`)
