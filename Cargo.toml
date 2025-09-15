@@ -16,7 +16,7 @@ license = "Apache-2.0 OR MIT"
 name = "rona"
 readme = "README.md"
 repository = "https://github.com/tomplanche/rona"
-version = "2.8.3"
+version = "2.8.4"
 
 [[bin]]
 doc = true
@@ -42,4 +42,4 @@ mockall = "0.13.1"
 tempfile = "3.22.0"
 
 [build-dependencies]
-hooksmith = "1.13.0"
+hooksmith = "1.15.0"
