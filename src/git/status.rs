@@ -75,7 +75,6 @@ pub fn get_status_files() -> Result<Vec<String>> {
                     Some(captures.get(1)?.as_str().to_string())
                 }
             } else {
-                println!("Error: unexpected line in git status: {line}");
                 None
             }
         })
