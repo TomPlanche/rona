@@ -102,15 +102,15 @@ pub fn extract_filenames(message: &str, pattern: &str) -> Result<Vec<String>> {
 
     let mut result = Vec::new();
     for line in message.lines() {
-        if regex.is_match(line) {
-            if let Some(captures) = regex.captures(line) {
-                // If we have a second capture group (renamed file), use that
-                // Otherwise use the first capture group
-                if let Some(new_name) = captures.get(2) {
-                    result.push(new_name.as_str().to_string());
-                } else if let Some(file_name) = captures.get(1) {
-                    result.push(file_name.as_str().to_string());
-                }
+        if regex.is_match(line)
+            && let Some(captures) = regex.captures(line)
+        {
+            // If we have a second capture group (renamed file), use that
+            // Otherwise use the first capture group
+            if let Some(new_name) = captures.get(2) {
+                result.push(new_name.as_str().to_string());
+            } else if let Some(file_name) = captures.get(1) {
+                result.push(file_name.as_str().to_string());
             }
         }
     }
