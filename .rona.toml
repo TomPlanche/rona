@@ -1,0 +1,7 @@
+editor = "nano"
+commit_types = [
+    "feat",
+    "chore",
+    "fix",
+    "docs",
+]
