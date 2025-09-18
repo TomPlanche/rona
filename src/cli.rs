@@ -33,6 +33,7 @@ use crate::{
         COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, generate_commit_message,
         get_status_files, git_add_with_exclude_patterns, git_commit, git_push,
     },
+    template::{TemplateVariables, process_template, validate_template},
 };
 use clap::{Command as ClapCommand, CommandFactory, Parser, Subcommand, ValueHint, command};
 use clap_complete::{Shell, generate};
@@ -314,7 +315,7 @@ fn handle_generate(interactive: bool, no_commit_number: bool, config: &Config) -
     generate_commit_message(commit_type, config.verbose, no_commit_number)?;
 
     if interactive {
-        handle_interactive_mode(commit_type, no_commit_number)?;
+        handle_interactive_mode(commit_type, no_commit_number, config)?;
     } else {
         handle_editor_mode(config)?;
     }
@@ -322,7 +323,11 @@ fn handle_generate(interactive: bool, no_commit_number: bool, config: &Config) -
 }
 
 /// Handle interactive mode for generate command
-fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<()> {
+fn handle_interactive_mode(
+    commit_type: &str,
+    no_commit_number: bool,
+    config: &Config,
+) -> Result<()> {
     use std::fs;
 
     println!("📝 Interactive mode: Enter your commit message.");
@@ -336,21 +341,52 @@ fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<
     }
 
     let branch_name = format_branch_name(&COMMIT_TYPES, &get_current_branch()?);
-
-    let formatted_message = if no_commit_number {
-        format!("({} on {}) {}", commit_type, branch_name, message.trim())
+    let commit_number = if no_commit_number {
+        None
     } else {
-        let commit_number = get_current_commit_nb()? + 1;
-        format!(
-            "[{}] ({} on {}) {}",
-            commit_number,
-            commit_type,
-            branch_name,
-            message.trim()
-        )
+        Some(get_current_commit_nb()? + 1)
     };
 
-    // Write the simple formatted message to commit_message.md
+    // Get template from config or use default
+    let template = config
+        .project_config
+        .template
+        .as_deref()
+        .unwrap_or("[{commit_number}] ({commit_type} on {branch_name}) {message}");
+
+    // Validate template
+    if let Err(e) = validate_template(template) {
+        println!("⚠️  Template validation error: {e}");
+        println!("Using fallback format...");
+        let formatted_message = if no_commit_number {
+            format!("({} on {}) {}", commit_type, branch_name, message.trim())
+        } else {
+            format!(
+                "[{}] ({} on {}) {}",
+                commit_number.unwrap(),
+                commit_type,
+                branch_name,
+                message.trim()
+            )
+        };
+        fs::write(COMMIT_MESSAGE_FILE_PATH, &formatted_message)?;
+        println!("\n✅ Commit message created!");
+        println!("📄 Message: {formatted_message}");
+        return Ok(());
+    }
+
+    // Create template variables
+    let variables = TemplateVariables::new(
+        commit_number,
+        commit_type.to_string(),
+        branch_name,
+        message.trim().to_string(),
+    )?;
+
+    // Process template
+    let formatted_message = process_template(template, &variables)?;
+
+    // Write the formatted message to commit_message.md
     fs::write(COMMIT_MESSAGE_FILE_PATH, &formatted_message)?;
 
     println!("\n✅ Commit message created!");
