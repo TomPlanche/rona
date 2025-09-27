@@ -1,187 +1,198 @@
 name: Build and Release
 
 on:
-    push:
-        branches: [main]
+  push:
+    branches: [main]
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-    check-version:
-        runs-on: ubuntu-latest
-        outputs:
-            version_changed: ${{ steps.version_check.outputs.changed }}
-            version: ${{ steps.version_check.outputs.version }}
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.version_check.outputs.changed }}
+      version: ${{ steps.version_check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            - name: Check version change
-              id: version_check
-              run: |
-                  PREV_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-                  CURR_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
-                  CURR_TAG="v${CURR_VERSION}"
-                  
-                  if [ "$PREV_VERSION" != "$CURR_TAG" ]; then
-                      echo "changed=true" >> $GITHUB_OUTPUT
-                      echo "version=${CURR_TAG}" >> $GITHUB_OUTPUT
-                      echo "Version changed from $PREV_VERSION to $CURR_TAG"
-                  else
-                      echo "changed=false" >> $GITHUB_OUTPUT
-                      echo "No version change detected"
-                  fi
+      - name: Check version change
+        id: version_check
+        run: |
+          PREV_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          CURR_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
+          CURR_TAG="v${CURR_VERSION}"
 
-    build-linux:
-        needs: check-version
-        if: needs.check-version.outputs.version_changed == 'true'
-        name: Build Linux Binary
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+          if [ "$PREV_VERSION" != "$CURR_TAG" ]; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "version=${CURR_TAG}" >> $GITHUB_OUTPUT
+              echo "Version changed from $PREV_VERSION to $CURR_TAG"
+          else
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "No version change detected"
+          fi
 
-            - name: Install Rust toolchain
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-                  override: true
-                  profile: minimal
+  build-linux:
+    needs: check-version
+    if: needs.check-version.outputs.version_changed == 'true'
+    name: Build Linux Binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Build release binary
-              uses: actions-rs/cargo@v1
-              with:
-                  command: build
-                  args: --release
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
 
-            - name: Create archive
-              run: |
-                  VERSION=${{ needs.check-version.outputs.version }}
-                  VERSION=${VERSION#v}  # Remove 'v' prefix
-                  mkdir -p release
-                  cp target/release/rona release/
-                  cd release
-                  tar -czvf rona-${VERSION}-linux-x86_64.tar.gz rona
-                  cd ..
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
 
-            - name: Generate Release Body
-              run: |
-                  cp .github/workflows/release_body.md release_body.md
-                  VERSION=${{ needs.check-version.outputs.version }}
-                  VERSION=${VERSION#v}  # Remove 'v' prefix
-                  sed -i.bak "s/\${GITHUB_REF#refs\/tags\/v}/${VERSION}/g" release_body.md
+      - name: Create archive
+        run: |
+          VERSION=${{ needs.check-version.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          mkdir -p release
+          cp target/release/rona release/
+          cd release
+          tar -czvf rona-${VERSION}-linux-x86_64.tar.gz rona
+          cd ..
 
-            - name: Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: release/rona-*-linux-x86_64.tar.gz
-                  body_path: release_body.md
-                  generate_release_notes: true
-                  append_body: true
+      - name: Generate Release Body
+        run: |
+          cp .github/workflows/release_body.md release_body.md
+          VERSION=${{ needs.check-version.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          sed -i.bak "s/\${GITHUB_REF#refs\/tags\/v}/${VERSION}/g" release_body.md
 
-    build-macos-intel:
-        needs: check-version
-        if: needs.check-version.outputs.version_changed == 'true'
-        name: Build macOS Intel Binary
-        runs-on: macos-latest
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Create and push tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          TAG=${{ needs.check-version.outputs.version }}
+          git tag $TAG
+          git push origin $TAG
 
-            - name: Install Rust toolchain
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-                  override: true
-                  profile: minimal
-                  target: x86_64-apple-darwin
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-version.outputs.version }}
+          files: release/rona-*-linux-x86_64.tar.gz
+          body_path: release_body.md
+          generate_release_notes: true
+          append_body: true
 
-            - name: Build release binary
-              uses: actions-rs/cargo@v1
-              with:
-                  command: build
-                  args: --release --target x86_64-apple-darwin
+  build-macos-intel:
+    needs: check-version
+    if: needs.check-version.outputs.version_changed == 'true'
+    name: Build macOS Intel Binary
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Create archive
-              run: |
-                  VERSION=${{ needs.check-version.outputs.version }}
-                  VERSION=${VERSION#v}  # Remove 'v' prefix
-                  mkdir -p release
-                  cp target/x86_64-apple-darwin/release/rona release/
-                  cd release
-                  tar -czvf rona-${VERSION}-macos-x86_64.tar.gz rona
-                  cd ..
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          target: x86_64-apple-darwin
 
-            - name: Calculate SHA256
-              run: |
-                  VERSION=${{ needs.check-version.outputs.version }}
-                  VERSION=${VERSION#v}  # Remove 'v' prefix
-                  cd release
-                  SHA256=$(shasum -a 256 rona-${VERSION}-macos-x86_64.tar.gz | cut -d ' ' -f 1)
-                  echo "SHA256_INTEL=${SHA256}" >> $GITHUB_ENV
-                  echo "### SHA256 (Intel)"  > sha256.md
-                  echo '```' >> sha256.md
-                  echo "${SHA256}  rona-${VERSION}-macos-x86_64.tar.gz" >> sha256.md
-                  echo '```' >> sha256.md
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target x86_64-apple-darwin
 
-            - name: Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: release/rona-*-macos-x86_64.tar.gz
-                  body_path: release/sha256.md
-                  append_body: true
+      - name: Create archive
+        run: |
+          VERSION=${{ needs.check-version.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          mkdir -p release
+          cp target/x86_64-apple-darwin/release/rona release/
+          cd release
+          tar -czvf rona-${VERSION}-macos-x86_64.tar.gz rona
+          cd ..
 
-    build-macos-arm:
-        needs: check-version
-        if: needs.check-version.outputs.version_changed == 'true'
-        name: Build macOS Apple Silicon Binary
-        runs-on: macos-latest
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Calculate SHA256
+        run: |
+          VERSION=${{ needs.check-version.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          cd release
+          SHA256=$(shasum -a 256 rona-${VERSION}-macos-x86_64.tar.gz | cut -d ' ' -f 1)
+          echo "SHA256_INTEL=${SHA256}" >> $GITHUB_ENV
+          echo "### SHA256 (Intel)"  > sha256.md
+          echo '```' >> sha256.md
+          echo "${SHA256}  rona-${VERSION}-macos-x86_64.tar.gz" >> sha256.md
+          echo '```' >> sha256.md
 
-            - name: Install Rust toolchain
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-                  override: true
-                  profile: minimal
-                  target: aarch64-apple-darwin
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-version.outputs.version }}
+          files: release/rona-*-macos-x86_64.tar.gz
+          body_path: release/sha256.md
+          append_body: true
 
-            - name: Build release binary
-              uses: actions-rs/cargo@v1
-              with:
-                  command: build
-                  args: --release --target aarch64-apple-darwin
+  build-macos-arm:
+    needs: check-version
+    if: needs.check-version.outputs.version_changed == 'true'
+    name: Build macOS Apple Silicon Binary
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Create archive
-              run: |
-                  VERSION=${{ needs.check-version.outputs.version }}
-                  VERSION=${VERSION#v}  # Remove 'v' prefix
-                  mkdir -p release
-                  cp target/aarch64-apple-darwin/release/rona release/
-                  cd release
-                  tar -czvf rona-${VERSION}-macos-arm64.tar.gz rona
-                  cd ..
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          target: aarch64-apple-darwin
 
-            - name: Calculate SHA256
-              run: |
-                  VERSION=${{ needs.check-version.outputs.version }}
-                  VERSION=${VERSION#v}  # Remove 'v' prefix
-                  cd release
-                  SHA256=$(shasum -a 256 rona-${VERSION}-macos-arm64.tar.gz | cut -d ' ' -f 1)
-                  echo "SHA256_ARM=${SHA256}" >> $GITHUB_ENV
-                  echo "### SHA256 (Apple Silicon)" > sha256.md
-                  echo '```' >> sha256.md
-                  echo "${SHA256}  rona-${VERSION}-macos-arm64.tar.gz" >> sha256.md
-                  echo '```' >> sha256.md
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target aarch64-apple-darwin
 
-            - name: Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: release/rona-*-macos-arm64.tar.gz
-                  body_path: release/sha256.md
-                  append_body: true
+      - name: Create archive
+        run: |
+          VERSION=${{ needs.check-version.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          mkdir -p release
+          cp target/aarch64-apple-darwin/release/rona release/
+          cd release
+          tar -czvf rona-${VERSION}-macos-arm64.tar.gz rona
+          cd ..
+
+      - name: Calculate SHA256
+        run: |
+          VERSION=${{ needs.check-version.outputs.version }}
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          cd release
+          SHA256=$(shasum -a 256 rona-${VERSION}-macos-arm64.tar.gz | cut -d ' ' -f 1)
+          echo "SHA256_ARM=${SHA256}" >> $GITHUB_ENV
+          echo "### SHA256 (Apple Silicon)" > sha256.md
+          echo '```' >> sha256.md
+          echo "${SHA256}  rona-${VERSION}-macos-arm64.tar.gz" >> sha256.md
+          echo '```' >> sha256.md
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-version.outputs.version }}
+          files: release/rona-*-macos-arm64.tar.gz
+          body_path: release/sha256.md
+          append_body: true
