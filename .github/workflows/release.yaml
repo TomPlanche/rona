@@ -2,14 +2,42 @@ name: Build and Release
 
 on:
     push:
-        tags:
-            - "v*"
+        branches: [main]
 
 permissions:
     contents: write
 
 jobs:
+    check-version:
+        runs-on: ubuntu-latest
+        outputs:
+            version_changed: ${{ steps.version_check.outputs.changed }}
+            version: ${{ steps.version_check.outputs.version }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Check version change
+              id: version_check
+              run: |
+                  PREV_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+                  CURR_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
+                  CURR_TAG="v${CURR_VERSION}"
+                  
+                  if [ "$PREV_VERSION" != "$CURR_TAG" ]; then
+                      echo "changed=true" >> $GITHUB_OUTPUT
+                      echo "version=${CURR_TAG}" >> $GITHUB_OUTPUT
+                      echo "Version changed from $PREV_VERSION to $CURR_TAG"
+                  else
+                      echo "changed=false" >> $GITHUB_OUTPUT
+                      echo "No version change detected"
+                  fi
+
     build-linux:
+        needs: check-version
+        if: needs.check-version.outputs.version_changed == 'true'
         name: Build Linux Binary
         runs-on: ubuntu-latest
         steps:
@@ -31,7 +59,8 @@ jobs:
 
             - name: Create archive
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
+                  VERSION=${{ needs.check-version.outputs.version }}
+                  VERSION=${VERSION#v}  # Remove 'v' prefix
                   mkdir -p release
                   cp target/release/rona release/
                   cd release
@@ -41,7 +70,8 @@ jobs:
             - name: Generate Release Body
               run: |
                   cp .github/workflows/release_body.md release_body.md
-                  VERSION=${GITHUB_REF#refs/tags/v}
+                  VERSION=${{ needs.check-version.outputs.version }}
+                  VERSION=${VERSION#v}  # Remove 'v' prefix
                   sed -i.bak "s/\${GITHUB_REF#refs\/tags\/v}/${VERSION}/g" release_body.md
 
             - name: Release
@@ -53,6 +83,8 @@ jobs:
                   append_body: true
 
     build-macos-intel:
+        needs: check-version
+        if: needs.check-version.outputs.version_changed == 'true'
         name: Build macOS Intel Binary
         runs-on: macos-latest
         steps:
@@ -75,7 +107,8 @@ jobs:
 
             - name: Create archive
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
+                  VERSION=${{ needs.check-version.outputs.version }}
+                  VERSION=${VERSION#v}  # Remove 'v' prefix
                   mkdir -p release
                   cp target/x86_64-apple-darwin/release/rona release/
                   cd release
@@ -84,7 +117,8 @@ jobs:
 
             - name: Calculate SHA256
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
+                  VERSION=${{ needs.check-version.outputs.version }}
+                  VERSION=${VERSION#v}  # Remove 'v' prefix
                   cd release
                   SHA256=$(shasum -a 256 rona-${VERSION}-macos-x86_64.tar.gz | cut -d ' ' -f 1)
                   echo "SHA256_INTEL=${SHA256}" >> $GITHUB_ENV
@@ -101,6 +135,8 @@ jobs:
                   append_body: true
 
     build-macos-arm:
+        needs: check-version
+        if: needs.check-version.outputs.version_changed == 'true'
         name: Build macOS Apple Silicon Binary
         runs-on: macos-latest
         steps:
@@ -123,7 +159,8 @@ jobs:
 
             - name: Create archive
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
+                  VERSION=${{ needs.check-version.outputs.version }}
+                  VERSION=${VERSION#v}  # Remove 'v' prefix
                   mkdir -p release
                   cp target/aarch64-apple-darwin/release/rona release/
                   cd release
@@ -132,7 +169,8 @@ jobs:
 
             - name: Calculate SHA256
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
+                  VERSION=${{ needs.check-version.outputs.version }}
+                  VERSION=${VERSION#v}  # Remove 'v' prefix
                   cd release
                   SHA256=$(shasum -a 256 rona-${VERSION}-macos-arm64.tar.gz | cut -d ' ' -f 1)
                   echo "SHA256_ARM=${SHA256}" >> $GITHUB_ENV
