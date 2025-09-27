@@ -33,12 +33,13 @@ use crate::{
         COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, generate_commit_message,
         get_status_files, git_add_with_exclude_patterns, git_commit, git_push,
     },
-    my_clap_theme,
+    template::{TemplateVariables, process_template, validate_template},
 };
 use clap::{Command as ClapCommand, CommandFactory, Parser, Subcommand, ValueHint, command};
 use clap_complete::{Shell, generate};
-use dialoguer::Select;
 use glob::Pattern;
+use inquire::ui::{Attributes, Color, RenderConfig, StyleSheet, Styled};
+use inquire::{Select, Text};
 use std::{io, process::Command};
 
 /// CLI's commands
@@ -172,6 +173,45 @@ fn build_cli() -> ClapCommand {
     Cli::command()
 }
 
+fn get_render_config() -> RenderConfig<'static> {
+    let mut render_config = RenderConfig::default();
+
+    // Prefix/icons
+    render_config.prompt_prefix = Styled::new("$").with_fg(Color::LightRed);
+    render_config.answered_prompt_prefix = Styled::new("✔").with_fg(Color::LightGreen);
+    render_config.highlighted_option_prefix = Styled::new("➠").with_fg(Color::LightBlue);
+    render_config.selected_checkbox = Styled::new("☑").with_fg(Color::LightGreen);
+    render_config.unselected_checkbox = Styled::new("☐").with_fg(Color::Black);
+    render_config.scroll_up_prefix = Styled::new("⇞").with_fg(Color::Black);
+    render_config.scroll_down_prefix = Styled::new("⇟").with_fg(Color::Black);
+
+    // Input prompt label
+    render_config.prompt = StyleSheet::new()
+        .with_fg(Color::LightCyan)
+        .with_attr(Attributes::BOLD);
+
+    // Help under the input
+    render_config.help_message = StyleSheet::new()
+        .with_fg(Color::DarkYellow)
+        .with_attr(Attributes::ITALIC);
+
+    // Validation error
+    render_config.error_message = render_config
+        .error_message
+        .with_prefix(Styled::new("❌").with_fg(Color::LightRed));
+
+    // Shown after submit (echoed answer)
+    render_config.answer = StyleSheet::new()
+        .with_fg(Color::LightMagenta)
+        .with_attr(Attributes::BOLD);
+
+    // Optional: default/placeholder styles
+    render_config.default_value = StyleSheet::new().with_fg(Color::LightBlue);
+    render_config.placeholder = StyleSheet::new().with_fg(Color::Black);
+
+    render_config
+}
+
 /// Print custom fish shell completions that enhance the auto-generated ones
 #[doc(hidden)]
 fn print_fish_custom_completions() {
@@ -267,17 +307,15 @@ fn handle_generate(interactive: bool, no_commit_number: bool, config: &Config) -
         |v| v.iter().map(String::as_str).collect::<Vec<&str>>(),
     );
 
-    let commit_type = commit_types_vec
-        [Select::with_theme(&my_clap_theme::ColorfulTheme::default())
-            .default(0)
-            .items(&commit_types_vec)
-            .interact()
-            .unwrap()];
+    let commit_type = Select::new("Select commit type", commit_types_vec)
+        .with_starting_cursor(0)
+        .prompt()
+        .unwrap();
 
     generate_commit_message(commit_type, config.verbose, no_commit_number)?;
 
     if interactive {
-        handle_interactive_mode(commit_type, no_commit_number)?;
+        handle_interactive_mode(commit_type, no_commit_number, config)?;
     } else {
         handle_editor_mode(config)?;
     }
@@ -285,17 +323,17 @@ fn handle_generate(interactive: bool, no_commit_number: bool, config: &Config) -
 }
 
 /// Handle interactive mode for generate command
-fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<()> {
-    use dialoguer::Input;
+fn handle_interactive_mode(
+    commit_type: &str,
+    no_commit_number: bool,
+    config: &Config,
+) -> Result<()> {
     use std::fs;
 
     println!("📝 Interactive mode: Enter your commit message.");
     println!("💡 Tip: Keep it concise and descriptive.");
 
-    let message: String = Input::with_theme(&my_clap_theme::ColorfulTheme::default())
-        .with_prompt("Message")
-        .interact()
-        .unwrap();
+    let message: String = Text::new("Message").prompt().unwrap();
 
     if message.trim().is_empty() {
         println!("⚠️  Empty message provided. Exiting.");
@@ -303,21 +341,52 @@ fn handle_interactive_mode(commit_type: &str, no_commit_number: bool) -> Result<
     }
 
     let branch_name = format_branch_name(&COMMIT_TYPES, &get_current_branch()?);
-
-    let formatted_message = if no_commit_number {
-        format!("({} on {}) {}", commit_type, branch_name, message.trim())
+    let commit_number = if no_commit_number {
+        None
     } else {
-        let commit_number = get_current_commit_nb()? + 1;
-        format!(
-            "[{}] ({} on {}) {}",
-            commit_number,
-            commit_type,
-            branch_name,
-            message.trim()
-        )
+        Some(get_current_commit_nb()? + 1)
     };
 
-    // Write the simple formatted message to commit_message.md
+    // Get template from config or use default
+    let template = config
+        .project_config
+        .template
+        .as_deref()
+        .unwrap_or("[{commit_number}] ({commit_type} on {branch_name}) {message}");
+
+    // Validate template
+    if let Err(e) = validate_template(template) {
+        println!("⚠️  Template validation error: {e}");
+        println!("Using fallback format...");
+        let formatted_message = if no_commit_number {
+            format!("({} on {}) {}", commit_type, branch_name, message.trim())
+        } else {
+            format!(
+                "[{}] ({} on {}) {}",
+                commit_number.unwrap(),
+                commit_type,
+                branch_name,
+                message.trim()
+            )
+        };
+        fs::write(COMMIT_MESSAGE_FILE_PATH, &formatted_message)?;
+        println!("\n✅ Commit message created!");
+        println!("📄 Message: {formatted_message}");
+        return Ok(());
+    }
+
+    // Create template variables
+    let variables = TemplateVariables::new(
+        commit_number,
+        commit_type.to_string(),
+        branch_name,
+        message.trim().to_string(),
+    )?;
+
+    // Process template
+    let formatted_message = process_template(template, &variables)?;
+
+    // Write the formatted message to commit_message.md
     fs::write(COMMIT_MESSAGE_FILE_PATH, &formatted_message)?;
 
     println!("\n✅ Commit message created!");
@@ -405,6 +474,9 @@ fn handle_set(editor: &str, config: &Config) -> Result<()> {
 /// # Returns
 /// * `Result<()>` - Ok if all operations succeed, Err with error details otherwise
 pub fn run() -> Result<()> {
+    // Apply global colors/styles for all inquire prompts
+    inquire::set_global_render_config(get_render_config());
+
     let cli = Cli::parse();
     let mut config = Config::new()?;
 
