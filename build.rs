@@ -7,14 +7,25 @@ fn main() {
     println!("cargo:rerun-if-changed=hooksmith.yaml");
 
     if let Err(err) = inner_main() {
-        eprintln!("Error: {err}");
-        std::process::exit(1);
+        // Only fail if we're in a git repository
+        // This allows building from tarballs (e.g., for Homebrew, cargo install from crates.io)
+        if Path::new(".git").exists() {
+            eprintln!("Error: {err}");
+            std::process::exit(1);
+        } else {
+            eprintln!("Warning: Git hooks not initialized (not in a git repository): {err}");
+        }
     }
 }
 
 fn inner_main() -> Result<(), Box<dyn std::error::Error>> {
-    let hooksmith_config_path = Path::new("hooksmith.yaml");
+    // Only initialize hooks if we're in a git repository
+    if !Path::new(".git").exists() {
+        println!("cargo:warning=Skipping git hooks initialization (not in a git repository)");
+        return Ok(());
+    }
 
+    let hooksmith_config_path = Path::new("hooksmith.yaml");
     hooksmith::init(hooksmith_config_path)?;
 
     Ok(())
