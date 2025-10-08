@@ -91,6 +91,14 @@ jobs:
           generate_release_notes: true
           append_body: true
 
+      - name: Publish to crates.io
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        run: |
+          cargo login $CRATES_IO_TOKEN
+          cargo publish --dry-run
+          cargo publish
+
   build-macos-intel:
     needs: check-version
     if: needs.check-version.outputs.version_changed == 'true'
