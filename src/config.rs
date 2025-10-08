@@ -21,18 +21,15 @@
 //! - Invalid configuration format
 //! - Home directory not found
 
-use crate::{
-    errors::{ConfigError, GitError, Result},
-    utils::print_error,
-};
-use std::io::Write;
-use std::{env, path::PathBuf};
-
-// use crate::my_clap_theme; // removed with dialoguer migration
-use crate::utils::find_project_root;
 use config as config_crate;
 use inquire::Select;
 use serde::{Deserialize, Serialize};
+use std::{env, io::Write, path::PathBuf};
+
+use crate::{
+    errors::{ConfigError, GitError, Result},
+    utils::{find_project_root, print_error},
+};
 
 // Define your default commit types
 const DEFAULT_COMMIT_TYPES: &[&str] = &["feat", "fix", "docs", "test", "chore"];

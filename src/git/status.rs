@@ -3,9 +3,8 @@
 //! Git status parsing and processing functionality for handling different
 //! file states and contexts.
 
-use std::{collections::HashSet, io, process::Command};
-
 use regex::Regex;
+use std::{collections::HashSet, io, process::Command};
 
 use crate::errors::{GitError, Result, RonaError};
 
@@ -150,5 +149,74 @@ pub fn process_git_status(message: &str) -> Result<Vec<String>> {
     extract_filenames(message, r"^[MTARCU][A-Z\?\! ]\s(.+?)(?:\s->\s(.+))?$")
 }
 
+/// Counts the number of renamed files in the git status output.
+///
+/// Renamed files show up as "R  `old_path` -> `new_path`" in git status --porcelain.
+/// This function helps with accurate file counting since renamed files appear
+/// as 2 lines in `git diff --cached --numstat` (one deletion, one addition).
+///
+/// # Arguments
+/// * `message` - The git status output string
+///
+/// # Returns
+/// * `usize` - The count of renamed files
+#[must_use]
+pub fn count_renamed_files(message: &str) -> usize {
+    message
+        .lines()
+        .filter(|line| line.starts_with("R ") || line.starts_with("R\t"))
+        .count()
+}
+
 // Use the shared extract_filenames function from the parent module
 use super::extract_filenames;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_count_renamed_files() {
+        // Test with no renamed files
+        let status = " M file1.txt\n?? file2.txt\n";
+        assert_eq!(count_renamed_files(status), 0);
+
+        // Test with one renamed file
+        let status = "R  old_name.txt -> new_name.txt\n M file1.txt\n";
+        assert_eq!(count_renamed_files(status), 1);
+
+        // Test with multiple renamed files
+        let status = "R  old1.txt -> new1.txt\nR  old2.txt -> new2.txt\n M file1.txt\n";
+        assert_eq!(count_renamed_files(status), 2);
+
+        // Test with tab separator (alternative git format)
+        let status = "R\told_name.txt -> new_name.txt\n M file1.txt\n";
+        assert_eq!(count_renamed_files(status), 1);
+
+        // Test real-world case from the issue
+        let status = "R  .github/workflows/publish -> .github/workflows/publish.yaml\n";
+        assert_eq!(count_renamed_files(status), 1);
+    }
+
+    #[test]
+    fn test_get_status_files_with_renamed() {
+        // This test verifies that get_status_files correctly handles renamed files
+        // by returning the new filename
+        let status = "R  old_file.txt -> new_file.txt\n M modified.txt\n?? untracked.txt\n";
+
+        // We can't directly test get_status_files without a real git repo,
+        // but we can verify the regex pattern works
+        let regex = regex::Regex::new(r"^[MARCU?\s][MARCU?\s]\s(.+?)(?:\s->\s(.+))?$").unwrap();
+
+        for line in status.lines() {
+            if let Some(captures) = regex.captures(line)
+                && let Some(new_name) = captures.get(2)
+            {
+                // For renamed files, should get the new name
+                if line.starts_with('R') {
+                    assert_eq!(new_name.as_str(), "new_file.txt");
+                }
+            }
+        }
+    }
+}

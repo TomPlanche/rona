@@ -5,8 +5,10 @@
 
 use std::process::Command;
 
-use crate::errors::{GitError, Result, RonaError};
-use crate::git::commit::get_current_commit_nb;
+use crate::{
+    errors::{GitError, Result, RonaError},
+    git::commit::get_current_commit_nb,
+};
 
 /// Attempts to get the default branch name from git config.
 ///
