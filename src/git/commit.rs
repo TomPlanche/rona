@@ -273,9 +273,8 @@ pub fn git_commit(args: &[String], unsigned: bool, verbose: bool, dry_run: bool)
     }
 
     let project_root = find_project_root()?;
-    std::env::set_current_dir(project_root)?;
+    let commit_file_path = project_root.join(COMMIT_MESSAGE_FILE_PATH);
 
-    let commit_file_path = Path::new(COMMIT_MESSAGE_FILE_PATH);
     if !commit_file_path.exists() {
         return Err(RonaError::Io(std::io::Error::other(
             "Commit message file not found",

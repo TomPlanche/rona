@@ -58,7 +58,6 @@ pub mod utils;
 use cli::run;
 use errors::Result;
 use std::process::exit;
-use utils::print_error;
 
 fn main() {
     if let Err(e) = inner_main() {

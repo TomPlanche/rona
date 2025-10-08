@@ -25,22 +25,23 @@
 //! - Handles configuration management
 //!
 
-use crate::git::{format_branch_name, get_current_branch, get_current_commit_nb};
-use crate::{
-    config::Config,
-    errors::Result,
-    git::{
-        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, generate_commit_message,
-        get_status_files, git_add_with_exclude_patterns, git_commit, git_push,
-    },
-    template::{TemplateVariables, process_template, validate_template},
-};
 use clap::{Command as ClapCommand, CommandFactory, Parser, Subcommand, ValueHint, command};
 use clap_complete::{Shell, generate};
 use glob::Pattern;
 use inquire::ui::{Attributes, Color, RenderConfig, StyleSheet, Styled};
 use inquire::{Select, Text};
 use std::{io, process::Command};
+
+use crate::{
+    config::Config,
+    errors::Result,
+    git::{
+        COMMIT_MESSAGE_FILE_PATH, COMMIT_TYPES, create_needed_files, format_branch_name,
+        generate_commit_message, get_current_branch, get_current_commit_nb, get_status_files,
+        git_add_with_exclude_patterns, git_commit, git_push,
+    },
+    template::{TemplateVariables, process_template, validate_template},
+};
 
 /// CLI's commands
 #[derive(Subcommand)]

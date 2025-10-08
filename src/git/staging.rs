@@ -10,7 +10,9 @@ use crate::errors::Result;
 
 use super::{
     repository::get_top_level_path,
-    status::{get_status_files, process_deleted_files_for_staging, read_git_status},
+    status::{
+        count_renamed_files, get_status_files, process_deleted_files_for_staging, read_git_status,
+    },
 };
 
 /// Adds files to the git index.
@@ -106,24 +108,33 @@ pub fn git_add_with_exclude_patterns(
     }
 
     let top_level_dir = get_top_level_path()?;
-    std::env::set_current_dir(&top_level_dir)?;
 
     let _ = Command::new("git")
+        .current_dir(&top_level_dir)
         .arg("add")
         .args(&files_to_add)
         .args(&deleted_files)
         .output()?;
 
+    // Get the new git status after staging to count renamed files
+    let new_git_status = read_git_status()?;
+    let renamed_count = count_renamed_files(&new_git_status);
+
     let staged = Command::new("git")
         .args(["diff", "--cached", "--numstat"])
         .output()?;
 
-    let staged_count =
-        String::from_utf8_lossy(&staged.stdout).lines().count() - deleted_files_count;
+    // Calculate counts:
+    // - git diff --cached --numstat shows 2 lines per renamed file (deletion + addition)
+    // - We need to subtract renamed_count to get the actual number of added files
+    // - We also subtract deleted_files_count since those appear separately
+    let staged_count = String::from_utf8_lossy(&staged.stdout).lines().count()
+        - deleted_files_count
+        - renamed_count;
     let excluded_count = staged_files_len - files_to_add.len();
 
     println!(
-        "Added {staged_count} files, deleted {deleted_files_count} and excluded {excluded_count} files for commit."
+        "Added {staged_count} files, deleted {deleted_files_count}, renamed {renamed_count} while excluding {excluded_count} files for commit."
     );
 
     Ok(())

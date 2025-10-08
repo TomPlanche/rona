@@ -4,11 +4,12 @@
 //! It provides a flexible templating system that allows users to customize how their
 //! commit messages are formatted using variables.
 
-use crate::errors::{Result, RonaError};
 use chrono::Local;
 use regex::Regex;
 use std::collections::HashMap;
 use std::process::Command;
+
+use crate::errors::{Result, RonaError};
 
 /// Template variables that can be used in commit message templates
 #[derive(Debug, Clone)]
