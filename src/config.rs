@@ -45,6 +45,10 @@ pub struct ProjectConfig {
 
     /// Custom commit types for this project
     pub commit_types: Option<Vec<String>>,
+
+    /// Template for interactive commit message generation
+    /// Available variables: {`commit_number`}, {`commit_type`}, {`branch_name`}, {`message`}, {`date`}, {`time`}, {`author`}, {`email`}
+    pub template: Option<String>,
 }
 
 impl Default for ProjectConfig {
@@ -56,6 +60,9 @@ impl Default for ProjectConfig {
                     .iter()
                     .map(std::string::ToString::to_string)
                     .collect(),
+            ),
+            template: Some(
+                "[{commit_number}] ({commit_type} on {branch_name}) {message}".to_string(),
             ),
         }
     }

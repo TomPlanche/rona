@@ -55,9 +55,47 @@ commit_types = [
     "test",    # Adding or updating tests
     "chore"    # Maintenance tasks
 ]
+
+# Template for interactive commit message generation
+# Available variables: {commit_number}, {commit_type}, {branch_name}, {message}, {date}, {time}, {author}, {email}
+template = "[{commit_number}] ({commit_type} on {branch_name}) {message}"
 ```
 
 **Note**: When no configuration exists, Rona falls back to: `["chore", "feat", "fix", "test"]`
+
+### Template Configuration
+
+Rona supports customizable templates for interactive commit message generation. You can define how your commit messages are formatted using variables:
+
+**Available Template Variables:**
+- `{commit_number}` - The commit number (incremental)
+- `{commit_type}` - The selected commit type (feat, fix, etc.)
+- `{branch_name}` - The current branch name
+- `{message}` - Your input message
+- `{date}` - Current date (YYYY-MM-DD)
+- `{time}` - Current time (HH:MM:SS)
+- `{author}` - Git author name
+- `{email}` - Git author email
+
+**Template Examples:**
+```toml
+# Default template
+template = "[{commit_number}] ({commit_type} on {branch_name}) {message}"
+
+# Simple format without commit number
+template = "({commit_type}) {message}"
+
+# Include date and time
+template = "[{date} {time}] {commit_type}: {message}"
+
+# Include author information
+template = "{commit_type}: {message} (by {author})"
+
+# Custom format
+template = "🚀 {commit_type} on {branch_name}: {message}"
+```
+
+**Note**: If no template is specified, Rona uses the default format: `[{commit_number}] ({commit_type} on {branch_name}) {message}`
 
 ### Working with Configuration
 
