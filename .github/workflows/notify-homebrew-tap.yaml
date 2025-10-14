@@ -7,11 +7,28 @@ on:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || github.ref_name }}
     steps:
+      - name: Debug event context
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Event action: ${{ github.event.action }}"
+          echo "Tag from release: ${{ github.event.release.tag_name }}"
+          echo "Ref name: ${{ github.ref_name }}"
+          echo "Resolved TAG: $TAG"
+
+      - name: Validate tag
+        run: |
+          if [ -z "$TAG" ]; then
+            echo "ERROR: No tag available (both github.event.release.tag_name and github.ref_name are empty)"
+            exit 1
+          fi
+          echo "Using tag: $TAG"
+
       - name: Check if PR already exists in tap (guard)
         id: guard
         env:
-          TAG: ${{ github.event.release.tag_name }}
           TOKEN: ${{ secrets.HOMEBREW_RONA_TOKEN }}
         run: |
           OWNER="rona-rs"
@@ -38,6 +55,6 @@ jobs:
           event-type: rona-release
           client-payload: |
             {
-              "tag": "${{ github.event.release.tag_name }}",
-              "tarball_url": "https://github.com/rona-rs/rona/archive/refs/tags/${{ github.event.release.tag_name }}.tar.gz"
+              "tag": "${{ env.TAG }}",
+              "tarball_url": "https://github.com/rona-rs/rona/archive/refs/tags/${{ env.TAG }}.tar.gz"
             }
