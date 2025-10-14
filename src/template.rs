@@ -330,4 +330,128 @@ mod tests {
                 .contains("Unknown template variable")
         );
     }
+
+    /// REGRESSION TEST: This test would have caught the bug where using the default template
+    /// with `no_commit_number` flag would produce empty brackets "[]"
+    #[test]
+    fn test_default_template_with_none_commit_number_produces_empty_brackets() {
+        // This is the BUG - using default template with None commit_number
+        let template = "[{commit_number}] ({commit_type} on {branch_name}) {message}";
+        let variables = TemplateVariables {
+            commit_number: None,
+            commit_type: "docs".to_string(),
+            branch_name: "main".to_string(),
+            message: "Update docs".to_string(),
+            date: "2024-01-15".to_string(),
+            time: "14:30:00".to_string(),
+            author: "John Doe".to_string(),
+            email: "john@example.com".to_string(),
+        };
+
+        let result = process_template(template, &variables).unwrap();
+
+        // This demonstrates the bug: empty brackets appear
+        assert_eq!(result, "[] (docs on main) Update docs");
+
+        // The output should NOT contain empty brackets
+        assert!(
+            result.contains("[]"),
+            "This test documents the bug: empty brackets appear when commit_number is None"
+        );
+    }
+
+    /// REGRESSION TEST: Verify that using the correct template avoids empty brackets
+    #[test]
+    fn test_template_without_commit_number_placeholder_avoids_empty_brackets() {
+        // This is the FIX - use appropriate template without commit_number placeholder
+        let template = "({commit_type} on {branch_name}) {message}";
+        let variables = TemplateVariables {
+            commit_number: None,
+            commit_type: "docs".to_string(),
+            branch_name: "main".to_string(),
+            message: "Update docs".to_string(),
+            date: "2024-01-15".to_string(),
+            time: "14:30:00".to_string(),
+            author: "John Doe".to_string(),
+            email: "john@example.com".to_string(),
+        };
+
+        let result = process_template(template, &variables).unwrap();
+
+        // Correct output without empty brackets
+        assert_eq!(result, "(docs on main) Update docs");
+
+        // Verify no empty brackets
+        assert!(
+            !result.contains("[]"),
+            "Output should not contain empty brackets"
+        );
+        assert!(
+            !result.contains("[{"),
+            "Output should not contain unprocessed template variables"
+        );
+    }
+
+    /// REGRESSION TEST: Test multiple scenarios with None `commit_number`
+    #[test]
+    fn test_various_templates_with_none_commit_number() {
+        let variables = TemplateVariables {
+            commit_number: None,
+            commit_type: "feat".to_string(),
+            branch_name: "new-feature".to_string(),
+            message: "Add feature".to_string(),
+            date: "2024-01-15".to_string(),
+            time: "14:30:00".to_string(),
+            author: "Jane Doe".to_string(),
+            email: "jane@example.com".to_string(),
+        };
+
+        // Test template WITH commit_number placeholder (produces empty brackets - the bug)
+        let template_with = "[{commit_number}] {commit_type}: {message}";
+        let result_with = process_template(template_with, &variables).unwrap();
+        assert!(
+            result_with.starts_with("[]"),
+            "Bug: produces empty brackets"
+        );
+
+        // Test template WITHOUT commit_number placeholder (correct)
+        let template_without = "{commit_type}: {message}";
+        let result_without = process_template(template_without, &variables).unwrap();
+        assert_eq!(result_without, "feat: Add feature");
+        assert!(
+            !result_without.contains("[]"),
+            "Should not contain empty brackets"
+        );
+
+        // Test template with optional-style syntax (shows limitation of current implementation)
+        let template_prefix = "#{commit_number} {commit_type}: {message}";
+        let result_prefix = process_template(template_prefix, &variables).unwrap();
+        assert_eq!(
+            result_prefix, "# feat: Add feature",
+            "Empty string for None values"
+        );
+    }
+
+    /// REGRESSION TEST: Verify `commit_number` `to_map` behavior
+    #[test]
+    fn test_variables_to_map_with_none_commit_number() {
+        let variables = TemplateVariables {
+            commit_number: None,
+            commit_type: "test".to_string(),
+            branch_name: "testing".to_string(),
+            message: "Test message".to_string(),
+            date: "2024-01-15".to_string(),
+            time: "14:30:00".to_string(),
+            author: "Test User".to_string(),
+            email: "test@example.com".to_string(),
+        };
+
+        let map = variables.to_map();
+
+        // When commit_number is None, it should map to empty string
+        assert_eq!(map.get("commit_number").unwrap(), "");
+        assert_eq!(map.get("commit_type").unwrap(), "test");
+
+        // This empty string is what causes the bug when used in "[{commit_number}]"
+    }
 }

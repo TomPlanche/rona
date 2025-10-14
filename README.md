@@ -29,8 +29,28 @@ Rona is a command-line interface tool designed to enhance your Git workflow with
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install rona-rs/rona/rona
+```
+
+Or, if you prefer to tap explicitly:
+
+```bash
+brew tap rona-rs/rona
+brew install rona
+```
+
+### Cargo (Alternative)
+
 ```bash
 cargo install rona
+```
+
+After installation, initialize Rona (optional, to set your preferred editor):
+
+```bash
 rona init [editor] # The editor to use for commit messages (default: nano)
 ```
 
